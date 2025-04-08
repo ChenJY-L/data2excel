@@ -1,4 +1,6 @@
 import re
+
+import xlwings.utils
 from dateutil import parser
 from pathlib import Path
 from fnmatch import translate
@@ -41,11 +43,18 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
         self.xwapp.display_alerts = False
         self.xwapp.screen_updating = False
 
+        # 绘图颜色配置
+        self.colors = ['#60966d','#5b3660','#018abe','#e90f44','#63adee','#924c63','#7c8fa3']
+
     # 功能区
     # 界面刷新
     def GuiRefresh(self, textbox, text):
         textbox.setPlainText(text)
         QApplication.processEvents()
+
+    # hex -> rgb -> int
+    def hexColor2Int(self, color):
+        return xw.utils.rgb_to_int(xw.utils.hex_to_rgb(color))
 
     # 文件选择
     def FileSelectF(self):
@@ -641,7 +650,7 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
 
                     self.GuiRefresh(self.Status, 'Plotting ' + str(p + 1) + '/' + str(pltN))
 
-                    ''' 为了解决diff1050 和diff1550-diff1050绘图位置的问题 '''
+                    """ 为了解决diff1050 和diff1550-diff1050绘图位置的问题 """
                     # figure_cah = cah if len(each) < 8 else cah/2
                     figure_lft = (lft + caw * int(p % 4)) if len(each) < 8 else lft + caw
                     figure_top = (tp + cah * int(p / 4)) if len(each) <= 8 else (tp + cah * int(p / 4)) + cah/2
@@ -745,29 +754,31 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
 
                     # 图例
                     chartApi.Legend.Format.TextFrame2.TextRange.Font.Size = gsftsz
+                    chartApi.Legend.Format.TextFrame2.TextRange.Font.Bold = 1
 
                     # 添加标志中的内容
                     series_count = chartApi.SeriesCollection().Count
                     series_count += 0 if int(tempindex[p]) != 0 else 1
 
                     if 'expInfo' in locals().keys() and (self.expInfoCheckBox.isChecked() or infoindex[p]):
-                        for item in expInfo['schedule']:
+                        for nitem, item in enumerate(expInfo['schedule']):
                             t = item['time'] + np.floor(timearr[0])
                             # 添加新的数据序列
                             y_min = chartApi.Axes(2, 1).MinimumScale
                             y_max = chartApi.Axes(2, 1).MaximumScale
                             series = chartApi.SeriesCollection().NewSeries()
+                            itemColor = self.hexColor2Int(self.colors[nitem])
                             if len(t) == 2:
                                 # 画一个框
                                 pointIdx = 3    # 读取框框右上角的点
-                                itemColor = 255
+                                # itemColor = 255
 
                                 series.XValues = [t[0], t[0], t[1], t[1], t[0]]  # 明确转换为数组
                                 series.Values = [y_min, y_max, y_max, y_min, y_min]
                             elif len(t) == 1:
                                 # 画一条线
                                 pointIdx = 2    # 读取上面的点
-                                itemColor = 16711680
+                                # itemColor = 16711680
 
                                 series.XValues = [t[0], t[0]]  # 明确转换为数组
                                 series.Values = [y_min, y_max]
@@ -785,9 +796,9 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
 
                             series.Points(pointIdx).ApplyDataLabels()
                             series.Points(pointIdx).DataLabel.Text = item["activity"]
-                            series.Points(pointIdx).DataLabel.Font.Size = axftsz + 1
+                            series.Points(pointIdx).DataLabel.Font.Size = axftsz + 2
                             series.Points(pointIdx).DataLabel.Font.Bold = 1
-                            series.Points(pointIdx).DataLabel.Format.TextFrame2.TextRange.Font.Fill.ForeColor.RGB = xw.utils.rgb_to_int((0, 0, 0))
+                            series.Points(pointIdx).DataLabel.Format.TextFrame2.TextRange.Font.Fill.ForeColor.RGB = itemColor
                             leg = chartApi.Legend.LegendEntries(series_count)
                             leg.Delete()
 
@@ -805,7 +816,7 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
                         Height=cah,       # 高度
                     )
                     # 设置文本和格式
-                    textbox.TextFrame2.TextRange.Characters.Text = "备注:\n" + expInfo['remark']
+                    textbox.TextFrame2.TextRange.Characters.Text = "备注:\n" + expInfo['remark'] if expInfo['remark'] is not None else "备注:\n"
                     textbox.TextFrame2.TextRange.ParagraphFormat.Alignment = 2  # 居中
                     textbox.TextFrame2.TextRange.Characters.Font.Name = "Times New Roman"
                     textbox.TextFrame2.TextRange.Characters.Font.Size = 40
