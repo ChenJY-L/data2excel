@@ -498,9 +498,9 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
                 caw = 700  # 图表宽度
                 cah = 400  # 图表高度
                 ttftsz = 20  # 标题字体大小
-                axftsz = 14  # 轴字体大小
+                axftsz = 16  # 轴字体大小
                 axttftsz = 16  # 轴标题字体大小
-                gsftsz = 14  # 图例字体大小
+                gsftsz = 16  # 图例字体大小
                 self.charts = []
                 # 绘图信息区，后面要修改就改这里
                 charttitles = ['12环差分信号vs.室温', '23环差分信号vs.测头旁皮肤温度',
@@ -717,14 +717,14 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
                     chartApi.ChartTitle.Format.TextFrame2.TextRange.Characters.Text = charttitles[p]  # 此处要改*************************************此处已改
                     chartApi.ChartTitle.Format.TextFrame2.TextRange.Font.Name = "Calibri"
                     chartApi.ChartTitle.Format.TextFrame2.TextRange.Characters.Font.Size = ttftsz  # 大小
-                    chartApi.ChartTitle.Format.TextFrame2.TextRange.Characters.Font.Bold = 0
+                    chartApi.ChartTitle.Format.TextFrame2.TextRange.Characters.Font.Bold = 1
 
                     # y坐标轴标题, 字体及大小
                     chartApi.Axes(2, 1).HasTitle = True
                     chartApi.Axes(2, 1).AxisTitle.Characters.Text = ytitle  # 此处要改*************************************此处已改
                     chartApi.Axes(2, 1).AxisTitle.Format.TextFrame2.TextRange.Font.Name = "Calibri"
                     chartApi.Axes(2, 1).AxisTitle.Format.TextFrame2.TextRange.Font.Size = axttftsz
-                    chartApi.Axes(2, 1).AxisTitle.Format.TextFrame2.TextRange.Font.Bold = 0
+                    chartApi.Axes(2, 1).AxisTitle.Format.TextFrame2.TextRange.Font.Bold = 1
 
                     if int(tempindex[p]) != 0:
                         # y2坐标轴标题, 字体及大小
@@ -732,13 +732,16 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
                         chartApi.Axes(2, 2).AxisTitle.Characters.Text = wb.sheets[sheetnames[7]].range(1, int(tempindex[p])).value  # 此处要改*************************************此处已改
                         chartApi.Axes(2, 2).AxisTitle.Format.TextFrame2.TextRange.Font.Name = "Calibri"
                         chartApi.Axes(2, 2).AxisTitle.Format.TextFrame2.TextRange.Font.Size = axttftsz
-                        chartApi.Axes(2, 2).AxisTitle.Format.TextFrame2.TextRange.Font.Bold = 0
+                        chartApi.Axes(2, 2).AxisTitle.Format.TextFrame2.TextRange.Font.Bold = 1
 
-                    # 三个坐标轴字体大小
+                    # 三个坐标轴字体大小 设置坐标轴字体加粗
                     chartApi.Axes(1).TickLabels.Font.Size = axftsz
+                    chartApi.Axes(1).TickLabels.Font.Bold = 1
                     chartApi.Axes(2, 1).TickLabels.Font.Size = axftsz
+                    chartApi.Axes(2, 1).TickLabels.Font.Bold = 1
                     if int(tempindex[p]) != 0:
                         chartApi.Axes(2, 2).TickLabels.Font.Size = axftsz
+                        chartApi.Axes(2, 2).TickLabels.Font.Bold = 1
 
                     # 图例
                     chartApi.Legend.Format.TextFrame2.TextRange.Font.Size = gsftsz
@@ -776,8 +779,8 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
 
                             # 设置序列的格式 (直线，颜色，粗细等)
                             series.ChartType = 75
-                            series.Format.Line.Weight = 4  # 线宽度
-                            series.Format.Line.DashStyle = 3    # 绘制虚线
+                            series.Format.Line.Weight = 2.5  # 线宽度
+                            series.Format.Line.DashStyle = 4    # 绘制虚线
                             series.Format.Line.ForeColor.RGB = itemColor
 
                             series.Points(pointIdx).ApplyDataLabels()
