@@ -506,17 +506,17 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
                 tp = 400  # 图表上距
                 caw = 700  # 图表宽度
                 cah = 400  # 图表高度
-                ttftsz = 20  # 标题字体大小
-                axftsz = 16  # 轴字体大小
-                axttftsz = 16  # 轴标题字体大小
-                gsftsz = 16  # 图例字体大小
+                ttftsz = 28  # 标题字体大小
+                axftsz = 18  # 轴字体大小
+                axttftsz = 18  # 轴标题字体大小
+                gsftsz = 18  # 图例字体大小
                 self.charts = []
                 # 绘图信息区，后面要修改就改这里
                 charttitles = ['12环差分信号vs.室温', '23环差分信号vs.测头旁皮肤温度',
                                '1050nm单环吸光度', '1219nm单环吸光度',
                                '34环差分信号vs.加热功率', '45环差分信号vs.测头下实际温度',
                                '1314nm单环吸光度', '1409nm单环吸光度',
-                               '1050nm差分吸光度vs.侧头下实际温度', '1550nm差分吸光度 - 1050nm差分吸光度',
+                               '1050nm差分吸光度vs.测头下实际温度', '1550nm差分吸光度 - 1050nm差分吸光度',
                                '1550nm单环吸光度', '1609nm单环吸光度',
                                ]
                 ringsindex = ['Diff12', 'Diff23', '1050', '1219',
@@ -753,7 +753,7 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
                         chartApi.Axes(2, 2).TickLabels.Font.Bold = 1
 
                     # 图例
-                    chartApi.Legend.Format.TextFrame2.TextRange.Font.Size = gsftsz
+                    chartApi.Legend.Format.TextFrame2.TextRange.Font.Size = gsftsz - 1
                     chartApi.Legend.Format.TextFrame2.TextRange.Font.Bold = 1
 
                     # 添加标志中的内容
@@ -767,7 +767,7 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
                             y_min = chartApi.Axes(2, 1).MinimumScale
                             y_max = chartApi.Axes(2, 1).MaximumScale
                             series = chartApi.SeriesCollection().NewSeries()
-                            itemColor = self.hexColor2Int(self.colors[nitem])
+                            itemColor = self.hexColor2Int(self.colors[nitem % len(self.colors)])
                             if len(t) == 2:
                                 # 画一个框
                                 pointIdx = 3    # 读取框框右上角的点
