@@ -228,7 +228,11 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
                 C = False
             Chvalues = []
             for i in range(1, Ch + 1):
-                datakword = Chpath.split(')-')[0] + ')-' + str(i) + '环.dat' if C else Chpath.split(')-')[0] + ')-Ch' + str(i) + '.dat'
+                match = re.match(r'^(.*?)-\d+环\.dat$', Chpath)
+                if match:
+                    prefix = match.group(1)
+                    datakword = f"{prefix}-{i}环.dat" if C else f"{prefix}-Ch{i}.dat"
+
                 wbd = self.xwapp.books.open(datakword)
                 rawsheet = wbd.sheets[0]
                 Chvalues.append(rawsheet.range(rawsheet.used_range).value)
@@ -351,8 +355,12 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
 
             # 接下来进行温度插值和写入
             # self.tempstarttime=datetime.datetime.now()
-            yinterp = np.empty((timearr.shape[0], Tempvalue.shape[1] - 1))
-            if self.TempCheckBox.isChecked() == True:
+            try:
+                yinterp = np.empty((timearr.shape[0], Tempvalue.shape[1] - 1))
+            except:
+                yinterp = np.empty((timearr.shape[0], 1))
+
+            if self.TempCheckBox.isChecked():
                 wb.sheets[sheetnames[len(sheetnames) - 1]].range(2, 1).value = timearr
                 wb.sheets[sheetnames[len(sheetnames) - 1]].range(2, 2).value = cycleNoarr
                 wb.sheets[sheetnames[len(sheetnames) - 1]].range(1, 2).value = Temptitle
@@ -485,12 +493,16 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
                 self.GuiRefresh(self.Status, 'Saving...')
                 wb.save()
 
-            rng_lcol = len(yinterp[1]) + 2
-            wb.sheets[sheetnames[7]].range(1, rng_lcol + 2).value = '血糖值' if C else 'Glucose Value'
-            wb.sheets[sheetnames[7]].range(2, rng_lcol + 1).value = timearr[0]
-            wb.sheets[sheetnames[7]].range(3, rng_lcol + 1).value = timearr[int(len(timearr) / 2)]
-            wb.sheets[sheetnames[7]].range(4, rng_lcol + 1).value = timearr[int(len(timearr) - 1)]
-            if self.OGTTCheckBox.isChecked() == True:
+            try:
+                rng_lcol = len(yinterp[1]) + 2
+            except:
+                print("No temperature data")
+                rng_lcol = 2
+            if self.OGTTCheckBox.isChecked():
+                wb.sheets[sheetnames[7]].range(1, rng_lcol + 2).value = '血糖值' if C else 'Glucose Value'
+                wb.sheets[sheetnames[7]].range(2, rng_lcol + 1).value = timearr[0]
+                wb.sheets[sheetnames[7]].range(3, rng_lcol + 1).value = timearr[int(len(timearr) / 2)]
+                wb.sheets[sheetnames[7]].range(4, rng_lcol + 1).value = timearr[int(len(timearr) - 1)]
                 wb.sheets[sheetnames[7]].range(2, rng_lcol + 2).value = 5.5
                 wb.sheets[sheetnames[7]].range(3, rng_lcol + 2).value = 10.5
                 wb.sheets[sheetnames[7]].range(4, rng_lcol + 2).value = 5.5
