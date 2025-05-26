@@ -742,7 +742,6 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
                     chartApi.ChartTitle.Format.TextFrame2.TextRange.Characters.Font.Bold = 1
 
                     # y坐标轴标题, 字体及大小
-                    # TODO: 设置坐标轴加粗（1.5），设置刻度，黑色
                     chartApi.Axes(2, 1).HasTitle = True
                     chartApi.Axes(2, 1).AxisTitle.Characters.Text = ytitle  # 此处要改*************************************此处已改
                     chartApi.Axes(2, 1).AxisTitle.Format.TextFrame2.TextRange.Font.Name = "Calibri"
