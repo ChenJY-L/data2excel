@@ -710,18 +710,19 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
                     # 图表整体样式
                     chartApi.ChartArea.Format.Line.ForeColor.RGB = 14277081  # 在VBA立即窗口中输入 ?RGB(217, 217, 217) 回车可查看其数值
                     # 三个坐标轴格式、颜色、线宽
-                    chartApi.Axes(1).MajorTickMark = -4142
-                    chartApi.Axes(1).Format.Line.Weight = 0.75
-                    chartApi.Axes(1).Format.Line.ForeColor.RGB = 14277081
-                    chartApi.Axes(2, 1).MajorTickMark = -4142
-                    chartApi.Axes(2, 1).Format.Line.Weight = 0.75
-                    chartApi.Axes(2, 1).Format.Line.ForeColor.RGB = 14277081
+                    # 之前的颜色为14277081
+                    chartApi.Axes(1).MajorTickMark = xlwings.constants.Constants.xlCross
+                    chartApi.Axes(1).Format.Line.Weight = 1.5
+                    chartApi.Axes(1).Format.Line.ForeColor.RGB = 0
+                    chartApi.Axes(2, 1).MajorTickMark = xlwings.constants.Constants.xlInside
+                    chartApi.Axes(2, 1).Format.Line.Weight = 1.5
+                    chartApi.Axes(2, 1).Format.Line.ForeColor.RGB = 0
                     chartApi.Axes(2, 1).MinorUnit = 0.001  if ytitle == 'ΔAd' else 0.01
 
                     if int(tempindex[p]) != 0:
-                        chartApi.Axes(2, 2).MajorTickMark = -4142
-                        chartApi.Axes(2, 2).Format.Line.Weight = 0.75
-                        chartApi.Axes(2, 2).Format.Line.ForeColor.RGB = 14277081
+                        chartApi.Axes(2, 2).MajorTickMark = xlwings.constants.Constants.xlInside
+                        chartApi.Axes(2, 2).Format.Line.Weight = 1.5
+                        chartApi.Axes(2, 2).Format.Line.ForeColor.RGB = 0
                     # X轴刻度间隔和格式
                     # self.charts[p].api[1].Axes(1).MajorUnit = xmaxunit
                     chartApi.Axes(1).TickLabels.NumberFormatLocal = "h:mm;@"
@@ -741,6 +742,7 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
                     chartApi.ChartTitle.Format.TextFrame2.TextRange.Characters.Font.Bold = 1
 
                     # y坐标轴标题, 字体及大小
+                    # TODO: 设置坐标轴加粗（1.5），设置刻度，黑色
                     chartApi.Axes(2, 1).HasTitle = True
                     chartApi.Axes(2, 1).AxisTitle.Characters.Text = ytitle  # 此处要改*************************************此处已改
                     chartApi.Axes(2, 1).AxisTitle.Format.TextFrame2.TextRange.Font.Name = "Calibri"
@@ -808,7 +810,8 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
 
                             series.Points(pointIdx).ApplyDataLabels()
                             series.Points(pointIdx).DataLabel.Text = item["activity"]
-                            series.Points(pointIdx).DataLabel.Font.Size = axftsz + 2
+                            # series.Points(pointIdx).DataLabel.Font.Size = axftsz + 2
+                            series.Points(pointIdx).DataLabel.Font.Size = 28
                             series.Points(pointIdx).DataLabel.Font.Bold = 1
                             series.Points(pointIdx).DataLabel.Format.TextFrame2.TextRange.Font.Fill.ForeColor.RGB = itemColor
                             leg = chartApi.Legend.LegendEntries(series_count)
