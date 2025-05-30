@@ -33,23 +33,49 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
         self.setWindowIcon(QIcon(':/favicon01.ico'))
         self.DyBCCheckBox.setChecked(True)
 
-        # 功能连接区
+        # Initialize Plot Configuration defaults
+        self.lft_spinbox.setValue(400)
+        self.tp_spinbox.setValue(400)
+        self.caw_spinbox.setValue(700)
+        self.cah_spinbox.setValue(400)
+
+        self.ttftsz_spinbox.setValue(28)
+        self.axftsz_spinbox.setValue(18)
+        self.axttftsz_spinbox.setValue(18)
+        self.gsftsz_spinbox.setValue(18)
+
+        # Set default for marker_style_combobox (xlMarkerStyleCircle, value 8)
+        default_marker_idx = self.marker_style_combobox.findData(8)  # 8 is for Circle
+        if default_marker_idx != -1:
+            self.marker_style_combobox.setCurrentIndex(default_marker_idx)
+
+        self.marker_size_spinbox.setValue(5)
+        self.axis_line_weight_spinbox.setValue(1.5)
+        self.grid_line_weight_spinbox.setValue(0.75)
+        self.event_marker_line_weight_spinbox.setValue(2.5)
+
+        # Set default for event_marker_dash_style_combobox (DashDot, value 4)
+        default_dash_idx = self.event_marker_dash_style_combobox.findData(4)  # 4 is for DashDot
+        if default_dash_idx != -1:
+            self.event_marker_dash_style_combobox.setCurrentIndex(default_dash_idx)
+
+        self.event_marker_label_size_spinbox.setValue(28)
+
+        # Connect signals to slots
         self.Process.clicked.connect(self.DataProcess)
         self.FileSelect.clicked.connect(self.FileSelectF)
 
         # excel计算初始化
-        # xlwings打开
         self.xwapp = xw.App(visible=False, add_book=False)
         self.xwapp.display_alerts = False
         self.xwapp.screen_updating = False
-
-        # 绘图颜色配置
-        self.colors = ['#60966d','#5b3660','#018abe','#e90f44','#63adee','#924c63','#7c8fa3']
+        self.colors = ['#60966d', '#5b3660', '#018abe', '#e90f44', '#63adee', '#924c63', '#7c8fa3']
 
     # 功能区
     # 界面刷新
-    def GuiRefresh(self, textbox, text):
-        textbox.setPlainText(text)
+    def GuiRefresh(self, textbox:QtWidgets.QLineEdit, text):
+        # textbox.setPlainText(text)
+        textbox.setText(text)
         QApplication.processEvents()
 
     # hex -> rgb -> int
@@ -514,14 +540,33 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
                     wb.sheets[sheetnames[i]].api.Columns("A:A").NumberFormatLocal = "[$-x-systime]h:mm:ss AM/PM"
                 # 开始绘图
                 # 常量赋值
-                lft = 400  # 图表左距
-                tp = 400  # 图表上距
-                caw = 700  # 图表宽度
-                cah = 400  # 图表高度
-                ttftsz = 28  # 标题字体大小
-                axftsz = 18  # 轴字体大小
-                axttftsz = 18  # 轴标题字体大小
-                gsftsz = 18  # 图例字体大小
+                # lft = 400  # 图表左距
+                # tp = 400  # 图表上距
+                # caw = 700  # 图表宽度
+                # cah = 400  # 图表高度
+                # ttftsz = 28  # 标题字体大小
+                # axftsz = 18  # 轴字体大小
+                # axttftsz = 18  # 轴标题字体大小
+                # gsftsz = 18  # 图例字体大小
+                # Constants赋值 (Retrieve from UI)
+                lft = self.lft_spinbox.value()
+                tp = self.tp_spinbox.value()
+                caw = self.caw_spinbox.value()
+                cah = self.cah_spinbox.value()
+                ttftsz = self.ttftsz_spinbox.value()
+                axftsz = self.axftsz_spinbox.value()
+                axttftsz = self.axttftsz_spinbox.value()
+                gsftsz = self.gsftsz_spinbox.value()
+
+                # Marker/Line style values
+                cfg_marker_style = self.marker_style_combobox.currentData()
+                cfg_marker_size = self.marker_size_spinbox.value()
+                cfg_axis_line_weight = self.axis_line_weight_spinbox.value()
+                cfg_grid_line_weight = self.grid_line_weight_spinbox.value()
+                cfg_event_marker_line_weight = self.event_marker_line_weight_spinbox.value()
+                cfg_event_marker_dash_style = self.event_marker_dash_style_combobox.currentData()
+                cfg_event_marker_label_size = self.event_marker_label_size_spinbox.value()
+
                 self.charts = []
                 # 绘图信息区，后面要修改就改这里
                 charttitles = ['12环差分信号vs.室温', '23环差分信号vs.测头旁皮肤温度',
@@ -704,24 +749,25 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
                     for i in range(1, chartApi.SeriesCollection().Count + 1):
                         series = chartApi.SeriesCollection(i)
                         # 修改每个系列的标记类型和大小
-                        series.MarkerStyle = 8  # 标记类型为圆形
-                        series.MarkerSize = 5  # 标记大小为5
+                        series.MarkerStyle = cfg_marker_style  # 标记类型为圆形
+                        series.MarkerSize = cfg_marker_size  # 标记大小为5
 
                     # 图表整体样式
                     chartApi.ChartArea.Format.Line.ForeColor.RGB = 14277081  # 在VBA立即窗口中输入 ?RGB(217, 217, 217) 回车可查看其数值
                     # 三个坐标轴格式、颜色、线宽
                     # 之前的颜色为14277081
-                    chartApi.Axes(1).MajorTickMark = xlwings.constants.Constants.xlCross
-                    chartApi.Axes(1).Format.Line.Weight = 1.5
+                    chartApi.Axes(1).MajorTickMark = xlwings.constants.Constants.xlInside
+                    chartApi.Axes(1).MinorTickMark = xlwings.constants.Constants.xlInside
+                    chartApi.Axes(1).Format.Line.Weight = cfg_axis_line_weight
                     chartApi.Axes(1).Format.Line.ForeColor.RGB = 0
                     chartApi.Axes(2, 1).MajorTickMark = xlwings.constants.Constants.xlInside
-                    chartApi.Axes(2, 1).Format.Line.Weight = 1.5
+                    chartApi.Axes(2, 1).Format.Line.Weight = cfg_axis_line_weight
                     chartApi.Axes(2, 1).Format.Line.ForeColor.RGB = 0
                     chartApi.Axes(2, 1).MinorUnit = 0.001  if ytitle == 'ΔAd' else 0.01
 
                     if int(tempindex[p]) != 0:
                         chartApi.Axes(2, 2).MajorTickMark = xlwings.constants.Constants.xlInside
-                        chartApi.Axes(2, 2).Format.Line.Weight = 1.5
+                        chartApi.Axes(2, 2).Format.Line.Weight = cfg_axis_line_weight
                         chartApi.Axes(2, 2).Format.Line.ForeColor.RGB = 0
                     # X轴刻度间隔和格式
                     # self.charts[p].api[1].Axes(1).MajorUnit = xmaxunit
@@ -730,9 +776,9 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
                     chartApi.SetElement(334)
                     chartApi.SetElement(330)
                     chartApi.Axes(1).MajorGridlines.Format.Line.ForeColor.RGB = 14277081
-                    chartApi.Axes(1).MajorGridlines.Format.Line.Weight = 0.75
+                    chartApi.Axes(1).MajorGridlines.Format.Line.Weight = cfg_grid_line_weight
                     chartApi.Axes(2).MajorGridlines.Format.Line.ForeColor.RGB = 14277081
-                    chartApi.Axes(2).MajorGridlines.Format.Line.Weight = 0.75
+                    chartApi.Axes(2).MajorGridlines.Format.Line.Weight = cfg_grid_line_weight
 
                     # 标题，字体及大小
                     chartApi.SetElement(2)
@@ -802,15 +848,15 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
                             chartApi.Axes(2, 1).MaximumScale = y_max
 
                             # 设置序列的格式 (直线，颜色，粗细等)
-                            series.ChartType = 75
-                            series.Format.Line.Weight = 2.5  # 线宽度
-                            series.Format.Line.DashStyle = 4    # 绘制虚线
+                            series.ChartType = xlwings.constants.ChartType.xlXYScatterLinesNoMarkers
+                            series.Format.Line.Weight = cfg_event_marker_line_weight  # 线宽度
+                            series.Format.Line.DashStyle = cfg_event_marker_dash_style    # 绘制虚线
                             series.Format.Line.ForeColor.RGB = itemColor
 
                             series.Points(pointIdx).ApplyDataLabels()
                             series.Points(pointIdx).DataLabel.Text = item["activity"]
                             # series.Points(pointIdx).DataLabel.Font.Size = axftsz + 2
-                            series.Points(pointIdx).DataLabel.Font.Size = 28
+                            series.Points(pointIdx).DataLabel.Font.Size = cfg_event_marker_label_size
                             series.Points(pointIdx).DataLabel.Font.Bold = 1
                             series.Points(pointIdx).DataLabel.Format.TextFrame2.TextRange.Font.Fill.ForeColor.RGB = itemColor
                             leg = chartApi.Legend.LegendEntries(series_count)
