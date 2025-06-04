@@ -14,175 +14,170 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 class Ui_Data_Processing(object):
     def setupUi(self, Data_Processing):
         Data_Processing.setObjectName("Data_Processing")
-        # Data_Processing.resize(455, 250)
-        Data_Processing.setFixedSize(480, 250)
+        # 调整窗口大小以适应GroupBox布局
+        Data_Processing.setFixedSize(600, 400)
         font = QtGui.QFont()
         font.setFamily("Calibri")
-        
-        # 环的选择 
-        self.Rings = QtWidgets.QComboBox(Data_Processing)
-        self.Rings.setGeometry(QtCore.QRect(20, 20, 151, 31))
-        font.setPointSize(12)
+        font.setPointSize(10)
+
+        # ==================== 数据输入组 ====================
+        self.dataInputGroup = QtWidgets.QGroupBox(Data_Processing)
+        self.dataInputGroup.setGeometry(QtCore.QRect(10, 10, 580, 80))
+        self.dataInputGroup.setFont(font)
+        self.dataInputGroup.setObjectName("dataInputGroup")
+
+        # 环数选择
+        self.Rings = QtWidgets.QComboBox(self.dataInputGroup)
+        self.Rings.setGeometry(QtCore.QRect(10, 25, 100, 25))
         self.Rings.setFont(font)
         self.Rings.setObjectName("Rings")
-        items = ["5 Rings", "7 Rings"]
-        self.Rings.addItems(items)
-        
-        # 文件路径及其标签
-        self.Path = QtWidgets.QTextEdit(Data_Processing)
-        self.Path.setGeometry(QtCore.QRect(200, 20, 160, 31))
-        font.setPointSize(9)
-        self.Path.setFont(font)
-        self.Path.setObjectName("Path")
+        self.Rings.addItems(["5 Rings", "7 Rings"])
 
-        self.FileSelect = QtWidgets.QPushButton(Data_Processing)
-        self.FileSelect.setGeometry(QtCore.QRect(360, 20, 71, 31))
-        font.setPointSize(12)
-        self.FileSelect.setFont(font)
-        self.FileSelect.setObjectName("FileSelect")
-        
-
-        # 数据校准与否的选择
-        self.Original = QtWidgets.QComboBox(Data_Processing)
-        self.Original.setGeometry(QtCore.QRect(20, 70, 151, 31))
-        font.setPointSize(12)
+        # 数据类型选择
+        self.Original = QtWidgets.QComboBox(self.dataInputGroup)
+        self.Original.setGeometry(QtCore.QRect(120, 25, 100, 25))
         self.Original.setFont(font)
         self.Original.setObjectName("Original")
         self.Original.addItem("")
         self.Original.addItem("")
-        
-        # 状态及其标签
-        self.Status = QtWidgets.QTextEdit(Data_Processing)
-        self.Status.setGeometry(QtCore.QRect(200, 70, 161, 31))
-        font.setPointSize(9)
-        self.Status.setFont(font)
-        self.Status.setObjectName("Status")
-        
-        self.StatusLabel = QtWidgets.QLabel(Data_Processing)
-        self.StatusLabel.setGeometry(QtCore.QRect(370, 70, 81, 30))
-        font.setPointSize(12)
-        self.StatusLabel.setFont(font)
-        self.StatusLabel.setObjectName("StatusLabel")
-        
-        # 计算按钮
-        self.Process = QtWidgets.QPushButton(Data_Processing)
-        self.Process.setGeometry(QtCore.QRect(330, 116, 101, 31))
-        font.setPointSize(12)
-        font.setBold(True)
-        font.setWeight(75)
-        self.Process.setFont(font)
-        self.Process.setAutoFillBackground(False)
-        self.Process.setStyleSheet("color: rgb(255, 0, 0);")
-        self.Process.setObjectName("Process")
-        font.setBold(False)
-        
-        # 温度勾选框
-        self.TempCheckBox = QtWidgets.QCheckBox(Data_Processing)
-        self.TempCheckBox.setGeometry(QtCore.QRect(20, 110, 201, 41))
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Maximum, QtWidgets.QSizePolicy.Policy.Maximum)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.TempCheckBox.sizePolicy().hasHeightForWidth())
-        self.TempCheckBox.setSizePolicy(sizePolicy)
-        self.TempCheckBox.setMaximumSize(QtCore.QSize(16777215, 16777215))
-        font.setPointSize(12)
+
+        # 文件路径
+        self.Path = QtWidgets.QTextEdit(self.dataInputGroup)
+        self.Path.setGeometry(QtCore.QRect(230, 25, 250, 25))
+        path_font = QtGui.QFont()
+        path_font.setFamily("Calibri")
+        path_font.setPointSize(9)
+        self.Path.setFont(path_font)
+        self.Path.setObjectName("Path")
+
+        # 文件选择按钮
+        self.FileSelect = QtWidgets.QPushButton(self.dataInputGroup)
+        self.FileSelect.setGeometry(QtCore.QRect(490, 25, 80, 25))
+        self.FileSelect.setFont(font)
+        self.FileSelect.setObjectName("FileSelect")
+
+        # ==================== 处理选项组 ====================
+        self.optionsGroup = QtWidgets.QGroupBox(Data_Processing)
+        self.optionsGroup.setGeometry(QtCore.QRect(10, 100, 580, 100))
+        self.optionsGroup.setFont(font)
+        self.optionsGroup.setObjectName("optionsGroup")
+
+        # 第一行选项
+        self.TempCheckBox = QtWidgets.QCheckBox(self.optionsGroup)
+        self.TempCheckBox.setGeometry(QtCore.QRect(10, 25, 120, 25))
         self.TempCheckBox.setFont(font)
-        self.TempCheckBox.setIconSize(QtCore.QSize(100, 100))
         self.TempCheckBox.setChecked(True)
-        self.TempCheckBox.setAutoRepeatInterval(100)
         self.TempCheckBox.setObjectName("TempCheckBox")
-        
-        # 基准周期及其标签
-        self.BaseCycle = QtWidgets.QSpinBox(Data_Processing)
-        self.BaseCycle.setGeometry(QtCore.QRect(250, 120, 71, 22))
-        font.setPointSize(12)
+
+        self.PLTCheckBox = QtWidgets.QCheckBox(self.optionsGroup)
+        self.PLTCheckBox.setGeometry(QtCore.QRect(140, 25, 80, 25))
+        self.PLTCheckBox.setFont(font)
+        self.PLTCheckBox.setChecked(True)
+        self.PLTCheckBox.setObjectName("PLTCheckBox")
+
+        self.OGTTCheckBox = QtWidgets.QCheckBox(self.optionsGroup)
+        self.OGTTCheckBox.setGeometry(QtCore.QRect(230, 25, 80, 25))
+        self.OGTTCheckBox.setFont(font)
+        self.OGTTCheckBox.setChecked(False)
+        self.OGTTCheckBox.setObjectName("OGTTCheckBox")
+
+        self.LDCheckBox = QtWidgets.QCheckBox(self.optionsGroup)
+        self.LDCheckBox.setGeometry(QtCore.QRect(320, 25, 60, 25))
+        self.LDCheckBox.setFont(font)
+        self.LDCheckBox.setChecked(False)
+        self.LDCheckBox.setObjectName("LDCheckBox")
+
+        # 第二行选项
+        self.DyBCCheckBox = QtWidgets.QCheckBox(self.optionsGroup)
+        self.DyBCCheckBox.setGeometry(QtCore.QRect(10, 55, 140, 25))
+        self.DyBCCheckBox.setFont(font)
+        self.DyBCCheckBox.setChecked(False)
+        self.DyBCCheckBox.setObjectName("DyBCCheckBox")
+
+        self.expInfoCheckBox = QtWidgets.QCheckBox(self.optionsGroup)
+        self.expInfoCheckBox.setGeometry(QtCore.QRect(160, 55, 120, 25))
+        self.expInfoCheckBox.setFont(font)
+        self.expInfoCheckBox.setChecked(False)
+        self.expInfoCheckBox.setObjectName("expInfoCheckBox")
+
+        self.waveDiffCheckBox = QtWidgets.QCheckBox(self.optionsGroup)
+        self.waveDiffCheckBox.setGeometry(QtCore.QRect(290, 55, 100, 25))
+        self.waveDiffCheckBox.setFont(font)
+        self.waveDiffCheckBox.setChecked(False)
+        self.waveDiffCheckBox.setObjectName("waveDiffCheckBox")
+
+        # ==================== 参数设置组 ====================
+        self.parametersGroup = QtWidgets.QGroupBox(Data_Processing)
+        self.parametersGroup.setGeometry(QtCore.QRect(10, 210, 280, 60))
+        self.parametersGroup.setFont(font)
+        self.parametersGroup.setObjectName("parametersGroup")
+
+        # 基准周期标签和输入框
+        self.BaseCycleLabel = QtWidgets.QLabel(self.parametersGroup)
+        self.BaseCycleLabel.setGeometry(QtCore.QRect(10, 25, 80, 25))
+        self.BaseCycleLabel.setFont(font)
+        self.BaseCycleLabel.setObjectName("BaseCycleLabel")
+
+        self.BaseCycle = QtWidgets.QSpinBox(self.parametersGroup)
+        self.BaseCycle.setGeometry(QtCore.QRect(100, 25, 80, 25))
         self.BaseCycle.setFont(font)
         self.BaseCycle.setMinimum(1)
         self.BaseCycle.setMaximum(99999999)
         self.BaseCycle.setProperty("value", 1)
         self.BaseCycle.setObjectName("BaseCycle")
-        
-        self.BaseCycleLabel = QtWidgets.QLabel(Data_Processing)
-        self.BaseCycleLabel.setGeometry(QtCore.QRect(170, 120, 91, 21))
-        font.setPointSize(12)
-        self.BaseCycleLabel.setFont(font)
-        self.BaseCycleLabel.setObjectName("BaseCycleLabel")
 
-        # Plot勾选框
-        self.PLTCheckBox = QtWidgets.QCheckBox(Data_Processing)
-        self.PLTCheckBox.setGeometry(QtCore.QRect(20, 140, 201, 41))
-        # sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Maximum, QtWidgets.QSizePolicy.Policy.Maximum)
-        # sizePolicy.setHeightForWidth(self.PLTCheckBox.sizePolicy().hasHeightForWidth())
-        # self.PLTCheckBox.setSizePolicy(sizePolicy)
-        font.setPointSize(12)
-        self.PLTCheckBox.setFont(font)
-        # self.PLTCheckBox.setIconSize(QtCore.QSize(100, 100))
-        self.PLTCheckBox.setChecked(True)
-        self.PLTCheckBox.setAutoRepeatInterval(100)
-        self.PLTCheckBox.setObjectName("PLTCheckBox")
+        # ==================== 控制组 ====================
+        self.controlGroup = QtWidgets.QGroupBox(Data_Processing)
+        self.controlGroup.setGeometry(QtCore.QRect(300, 210, 290, 60))
+        self.controlGroup.setFont(font)
+        self.controlGroup.setObjectName("controlGroup")
 
-        # OGTT勾选框
-        self.OGTTCheckBox = QtWidgets.QCheckBox(Data_Processing)
-        self.OGTTCheckBox.setGeometry(QtCore.QRect(90, 140, 141, 41))
-        font.setPointSize(12)
-        self.OGTTCheckBox.setFont(font)
-        self.OGTTCheckBox.setChecked(False)
-        # self.OGTTCheckBox.setAutoRepeatInterval(100)
-        self.OGTTCheckBox.setObjectName("OGTTCheckBox")
+        # 处理按钮
+        self.Process = QtWidgets.QPushButton(self.controlGroup)
+        self.Process.setGeometry(QtCore.QRect(180, 20, 100, 30))
+        process_font = QtGui.QFont()
+        process_font.setFamily("Calibri")
+        process_font.setPointSize(12)
+        process_font.setBold(True)
+        self.Process.setFont(process_font)
+        self.Process.setStyleSheet("color: rgb(255, 0, 0);")
+        self.Process.setObjectName("Process")
 
-        # DyBC勾选框
-        self.DyBCCheckBox = QtWidgets.QCheckBox(Data_Processing)
-        self.DyBCCheckBox.setGeometry(QtCore.QRect(135, 140, 161, 41))
-        self.DyBCCheckBox.setLayoutDirection(QtCore.Qt.LayoutDirection.RightToLeft)
-        font.setPointSize(12)
-        self.DyBCCheckBox.setFont(font)
-        self.DyBCCheckBox.setChecked(False)
-        self.DyBCCheckBox.setObjectName("DyBCCheckBox")
+        # 状态显示
+        self.StatusLabel = QtWidgets.QLabel(self.controlGroup)
+        self.StatusLabel.setGeometry(QtCore.QRect(10, 25, 50, 25))
+        self.StatusLabel.setFont(font)
+        self.StatusLabel.setObjectName("StatusLabel")
 
-        # LD勾选框
-        self.LDCheckBox = QtWidgets.QCheckBox(Data_Processing)
-        self.LDCheckBox.setGeometry(QtCore.QRect(316, 140, 191, 41))
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Maximum, QtWidgets.QSizePolicy.Policy.Maximum)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.LDCheckBox.sizePolicy().hasHeightForWidth())
-        self.LDCheckBox.setSizePolicy(sizePolicy)
-        self.LDCheckBox.setMaximumSize(QtCore.QSize(16777215, 16777215))
-        font.setPointSize(12)
-        self.LDCheckBox.setFont(font)
-        self.LDCheckBox.setIconSize(QtCore.QSize(100, 100))
-        self.LDCheckBox.setChecked(False)
-        self.LDCheckBox.setAutoRepeatInterval(100)
-        self.LDCheckBox.setObjectName("LDCheckBox")
+        self.Status = QtWidgets.QTextEdit(self.controlGroup)
+        # self.Status.setEnabled(False)
+        self.Status.setGeometry(QtCore.QRect(65, 25, 110, 25))
+        status_font = QtGui.QFont()
+        status_font.setFamily("Calibri")
+        status_font.setPointSize(9)
+        self.Status.setFont(status_font)
+        self.Status.setObjectName("Status")
 
-        # 部分标注勾选框
-        self.expInfoCheckBox = QtWidgets.QCheckBox(Data_Processing)
-        self.expInfoCheckBox.setGeometry(QtCore.QRect(380, 140, 221, 41))
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Maximum, QtWidgets.QSizePolicy.Policy.Maximum)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.expInfoCheckBox.sizePolicy().hasHeightForWidth())
-        self.expInfoCheckBox.setSizePolicy(sizePolicy)
-        self.expInfoCheckBox.setMaximumSize(QtCore.QSize(16777215, 16777215))
-        font.setPointSize(12)
-        self.expInfoCheckBox.setFont(font)
-        self.expInfoCheckBox.setIconSize(QtCore.QSize(100, 100))
-        self.expInfoCheckBox.setChecked(False)
-        self.expInfoCheckBox.setAutoRepeatInterval(100)
-        self.expInfoCheckBox.setObjectName("expInfoCheckBox")
+        # ==================== 信息显示组 ====================
+        self.infoGroup = QtWidgets.QGroupBox(Data_Processing)
+        self.infoGroup.setGeometry(QtCore.QRect(10, 280, 580, 80))
+        self.infoGroup.setFont(font)
+        self.infoGroup.setObjectName("infoGroup")
 
-        # 错误及其标签
-        self.ErrorText = QtWidgets.QTextEdit(Data_Processing)
-        self.ErrorText.setGeometry(QtCore.QRect(20, 190, 361, 51))
-        font.setPointSize(9)
-        self.ErrorText.setFont(font)
-        self.ErrorText.setObjectName("ErrorText")
-        
-        self.ErrorLabel = QtWidgets.QLabel(Data_Processing)
-        self.ErrorLabel.setGeometry(QtCore.QRect(390, 190, 71, 22))
-        font.setPointSize(12)
+        # 错误信息标签和文本框
+        self.ErrorLabel = QtWidgets.QLabel(self.infoGroup)
+        self.ErrorLabel.setGeometry(QtCore.QRect(10, 25, 50, 25))
         self.ErrorLabel.setFont(font)
         self.ErrorLabel.setObjectName("ErrorLabel")
+
+        self.ErrorText = QtWidgets.QTextEdit(self.infoGroup)
+        # self.ErrorText.setEnabled(False)
+        self.ErrorText.setGeometry(QtCore.QRect(70, 25, 500, 45))
+        error_font = QtGui.QFont()
+        error_font.setFamily("Calibri")
+        error_font.setPointSize(9)
+        self.ErrorText.setFont(error_font)
+        self.ErrorText.setObjectName("ErrorText")
 
         # 设置功能 —— 连接功能区
         self.retranslateUi(Data_Processing)
@@ -191,17 +186,30 @@ class Ui_Data_Processing(object):
     # 程序自带转译区
     def retranslateUi(self, Data_Processing):
         _translate = QtCore.QCoreApplication.translate
-        # Data_Processing.setWindowTitle(_translate("Data_Processing", "Data_Processing 20240705"))
+        Data_Processing.setWindowTitle(_translate("Data_Processing", "Data Processing Tool"))
+
+        # GroupBox 标题
+        self.dataInputGroup.setTitle(_translate("Data_Processing", "数据输入 / Data Input"))
+        self.optionsGroup.setTitle(_translate("Data_Processing", "处理选项 / Processing Options"))
+        self.parametersGroup.setTitle(_translate("Data_Processing", "参数设置 / Parameters"))
+        self.controlGroup.setTitle(_translate("Data_Processing", "控制 / Control"))
+        self.infoGroup.setTitle(_translate("Data_Processing", "信息显示 / Information"))
+
+        # 控件文本
         self.Original.setItemText(0, _translate("Data_Processing", "Calibrated"))
         self.Original.setItemText(1, _translate("Data_Processing", "Original"))
+        self.FileSelect.setText(_translate("Data_Processing", "Select File"))
+
+        self.TempCheckBox.setText(_translate("Data_Processing", "Temperature"))
+        self.PLTCheckBox.setText(_translate("Data_Processing", "Plot"))
+        self.OGTTCheckBox.setText(_translate("Data_Processing", "OGTT"))
+        self.LDCheckBox.setText(_translate("Data_Processing", "LD"))
+        self.DyBCCheckBox.setText(_translate("Data_Processing", "Dynamic Base"))
+        self.expInfoCheckBox.setText(_translate("Data_Processing", "Info for All"))
+        self.waveDiffCheckBox.setText(_translate("Data_Processing", "1550-1050"))
+
+        self.BaseCycleLabel.setText(_translate("Data_Processing", "Base Cycle:"))
+
         self.Process.setText(_translate("Data_Processing", "Process"))
-        self.TempCheckBox.setText(_translate("Data_Processing", "Temperature?"))
-        self.ErrorLabel.setText(_translate("Data_Processing", "Error"))
-        self.StatusLabel.setText(_translate("Data_Processing", "Status"))
-        self.FileSelect.setText(_translate("Data_Processing", "File"))
-        self.PLTCheckBox.setText(_translate("Data_Processing", "Plot?"))
-        self.OGTTCheckBox.setText(_translate("Data_Processing", "OGTT?"))
-        self.BaseCycleLabel.setText(_translate("Data_Processing", "BaseCycle"))
-        self.DyBCCheckBox.setText(_translate("Data_Processing", "Dyna Basecycle?"))
-        self.LDCheckBox.setText(_translate("Data_Processing", "LD?"))
-        self.expInfoCheckBox.setText(_translate("Data_Processing", "Info for all?"))
+        self.StatusLabel.setText(_translate("Data_Processing", "Status:"))
+        self.ErrorLabel.setText(_translate("Data_Processing", "Info:"))

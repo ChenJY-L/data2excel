@@ -1,12 +1,26 @@
-import re
+"""
+数据处理工具 - 将DAT文件转换为Excel格式并生成图表
 
+主要功能：
+1. 读取多环光谱数据文件(.dat格式)
+2. 处理温度数据和实验信息
+3. 计算单环和差分吸光度数据
+4. 生成Excel报告和图表
+5. 支持动态基准周期和血糖数据处理
+
+作者：[作者信息]
+版本：[版本信息]
+最后更新：[更新日期]
+"""
+
+import re
 import xlwings.utils
 from dateutil import parser
 from pathlib import Path
 from fnmatch import translate
 import sys
 # import killpywintypes
-import xlwings as xw  # excel操作模块
+import xlwings as xw  # Excel操作模块
 import datetime  # 时间模块
 # import time
 import os
@@ -16,7 +30,7 @@ from PyQt6.QtWidgets import *
 from PyQt6.QtCore import *
 from PyQt6.QtGui import *
 from PyQt6.QtGui import QIcon
-import gui as QTUI  # 此处需要根据需要改名，第二个变量不改也可以
+import gui as QTUI  # GUI界面模块
 import ico01
 import ctypes
 
@@ -24,40 +38,103 @@ ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("myappid")
 
 
 class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
+    """
+    数据处理主界面类
+
+    继承自QDialog和GUI界面类，提供数据处理的图形用户界面
+    主要功能包括文件选择、数据处理、Excel生成和图表绘制
+    """
+
+    # ==================== 类配置变量 ====================
+
+    # 图表绘制配置
+    CHART_LEFT = 400        # 图表左距
+    CHART_TOP = 400         # 图表上距
+    CHART_WIDTH = 700       # 图表宽度
+    CHART_HEIGHT = 400      # 图表高度
+
+    # 字体大小配置
+    TITLE_FONT_SIZE = 28    # 标题字体大小
+    AXIS_FONT_SIZE = 18     # 轴字体大小
+    AXIS_TITLE_FONT_SIZE = 18  # 轴标题字体大小
+    LEGEND_FONT_SIZE = 18   # 图例字体大小
+    ANNOTATION_FONT_SIZE = 40  # 标注字体大小
+    MAIN_TITLE_FONT_SIZE = 54  # 主标题字体大小
+    LABEL_FONT_SIZE = 28    # 标签字体大小
+
+    # 图表样式配置
+    CHART_BORDER_COLOR = 14277081  # 图表边框颜色
+    GRID_COLOR = 14277081          # 网格线颜色
+    GRID_WEIGHT = 0.75             # 网格线粗细
+    AXIS_WEIGHT = 1.5              # 坐标轴线粗细
+    ANNOTATION_LINE_WEIGHT = 2.5   # 标注线粗细
+
+    # 颜色配置
+    CHART_COLORS = ['#60966d','#5b3660','#018abe','#e90f44','#63adee','#924c63','#7c8fa3']
+    TITLE_BOX_COLOR = (255, 255, 0)  # 标题框背景色（黄色）
+
     def __init__(self, parent=None):
+        """
+        初始化GUI界面
+
+        Args:
+            parent: 父窗口对象，默认为None
+        """
         super(GUI_Dialog, self).__init__(parent)
         self.setupUi(self)
+
+        # 设置窗口标题和图标
         current_file = os.path.basename(__file__)
         current_file = os.path.splitext(current_file)[0][-8:]
         self.setWindowTitle('Data_Processing ' + current_file)
         self.setWindowIcon(QIcon(':/favicon01.ico'))
-        self.DyBCCheckBox.setChecked(True)
 
-        # 功能连接区
+        # 设置默认选项
+        # self.DyBCCheckBox.setChecked(True)
+
+        # 连接信号和槽函数
         self.Process.clicked.connect(self.DataProcess)
         self.FileSelect.clicked.connect(self.FileSelectF)
 
-        # excel计算初始化
-        # xlwings打开
+        # 初始化Excel应用程序
         self.xwapp = xw.App(visible=False, add_book=False)
         self.xwapp.display_alerts = False
         self.xwapp.screen_updating = False
 
-        # 绘图颜色配置
-        self.colors = ['#60966d','#5b3660','#018abe','#e90f44','#63adee','#924c63','#7c8fa3']
+        # 初始化图表列表
+        self.charts = []
 
-    # 功能区
-    # 界面刷新
+    # ==================== 工具函数区 ====================
+
     def GuiRefresh(self, textbox, text):
+        """
+        刷新GUI界面文本框内容
+
+        Args:
+            textbox: 要更新的文本框控件
+            text: 要显示的文本内容
+        """
         textbox.setPlainText(text)
         QApplication.processEvents()
 
-    # hex -> rgb -> int
     def hexColor2Int(self, color):
+        """
+        将十六进制颜色值转换为整数
+
+        Args:
+            color: 十六进制颜色字符串，如'#FF0000'
+
+        Returns:
+            int: 对应的整数颜色值
+        """
         return xw.utils.rgb_to_int(xw.utils.hex_to_rgb(color))
 
-    # 文件选择
     def FileSelectF(self):
+        """
+        文件选择对话框
+
+        打开文件选择对话框，允许用户选择DAT数据文件
+        """
         self.GuiRefresh(self.Status, 'Selecting Path')
         SchPath = os.getcwd()
         if self.Path.toPlainText() != '':
@@ -66,8 +143,17 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
         if filenames[0] != []:
             self.Path.setPlainText(filenames[0][0])
 
-    # 文件路径获取
     def FilePath(self, path, filename):
+        """
+        根据关键词在指定路径中查找文件
+
+        Args:
+            path: 搜索路径
+            filename: 文件名关键词
+
+        Returns:
+            str: 找到的文件完整路径，如果未找到则返回空路径
+        """
         filenames = os.listdir(path)
         filenamesnew = []
         for i in range(0, len(filenames)):
@@ -79,9 +165,18 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
             basefilename = filenamesnew[len(filenamesnew) - 1]
         return os.path.join(path, basefilename)
 
-    # 检查sheet是否存在
     def CheckSheet(self, workbook, sheetname):
-        num = len(workbook.sheets)  # 获取sheet个数
+        """
+        检查Excel工作簿中是否存在指定名称的工作表
+
+        Args:
+            workbook: Excel工作簿对象
+            sheetname: 要检查的工作表名称
+
+        Returns:
+            bool: 如果工作表存在返回True，否则返回False
+        """
+        num = len(workbook.sheets)  # 获取工作表个数
         x = []
         for sc in range(0, num):
             if sc >= 0:
@@ -98,9 +193,19 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
         else:
             return True
 
-            # 定义查找获取单元格函数
-
     def FindRowColRange(self, SheetName, Rttype, KeyWord, RangeStr):
+        """
+        在Excel工作表中查找关键词并返回单元格信息
+
+        Args:
+            SheetName: Excel工作表对象
+            Rttype: 返回类型 ('Adr'=地址, 'Row'=行号, 'Col'=列号, 'Ran'=行列号)
+            KeyWord: 要查找的关键词
+            RangeStr: 搜索范围字符串
+
+        Returns:
+            str: 根据Rttype返回相应的单元格信息
+        """
         try:
             Cell_Address = SheetName.range(RangeStr).api.Find(What=KeyWord, LookAt=xw.constants.LookAt.xlWhole)
             Cell_Row = Cell_Address.Row
@@ -122,8 +227,20 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
             Cell_Result = Cell_Ran
         return Cell_Result
 
-    # 删除特定元素
     def popele(self, arrayin, ele):
+        """
+        从数组中删除特定元素（注意：此函数逻辑可能有问题）
+
+        Args:
+            arrayin: 输入数组
+            ele: 要删除的元素
+
+        Returns:
+            numpy.array: 处理后的数组
+
+        Note:
+            原始逻辑中的条件判断可能有问题，建议重新审查
+        """
         arrayout = []
         for index in range(len(arrayin) - 1, -1, -1):
             if arrayin[index] != ele & np.isnan(arrayin[index]):
@@ -132,14 +249,21 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
         return arrayout
 
 
-    """ 标注文本解析函数 """
     def parseText(self, text):
-        """ 从excel中读取时间和行为
-            判断依据是分号，如果一行的开头是中文，则读取第一个分号为分界点，分号之前是行为，分号之后的内容分解为时间
-            如果一行的开头是数字，则读取最后一个分号，分号之后是行为，分号之前是时间
-            时间段和时间点都会被处理成excel中的时间段（即小数形式）
-            当读取到一行的开头为备注时，后续的全部内容都会被读取为备注信息
-            返回类型为dict
+        """
+        解析实验标注文本，提取时间和活动信息
+
+        解析规则：
+        1. 如果一行开头是中文，则第一个冒号前是活动，冒号后是时间
+        2. 如果一行开头是数字，则最后一个冒号前是时间，冒号后是活动
+        3. 时间段和时间点都会被转换为Excel时间格式（小数形式）
+        4. 当遇到"备注"开头的行时，后续所有内容都作为备注信息
+
+        Args:
+            text: 要解析的文本内容
+
+        Returns:
+            dict: 包含'schedule'(时间安排列表)和'remark'(备注信息)的字典
         """
         schedule = []
         remark = []
@@ -196,93 +320,558 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
             "remark": "\n".join(remark).strip() if remark else None
         }
 
-    # 数据处理专区
+    # ==================== 数据处理子函数区 ====================
+
+    def load_and_validate_data(self):
+        """
+        加载和验证数据文件
+
+        Returns:
+            tuple: (Chvalues, Ch, C, Chpath)
+                - Chvalues: 各环数据数组
+                - Ch: 环数
+                - C: 是否为中文文件名
+                - Chpath: 数据文件路径
+        """
+        # 确定文件路径
+        if self.Path.toPlainText() == '':
+            self.GuiRefresh(self.Status, 'Obtaining File Path')
+            path = os.getcwd()  # 当前文件位置
+            filekwords = self.Original.currentText() + ')-' + 'Ch1.dat'
+            if self.Original.currentText() == 'Calibrated':
+                filekwordsC = '校准后' + ')-' + '1环.dat'
+            elif self.Original.currentText() == 'Original':
+                filekwordsC = '原始值' + ')-' + '1环.dat'
+            self.Path.setPlainText(max(self.FilePath(path, filekwords), self.FilePath(path, filekwordsC)))
+
+        # 确定环数
+        if self.Rings.currentText() == '5 Rings':
+            Ch = 5
+        elif self.Rings.currentText() == '7 Rings':
+            Ch = 7
+
+        # 获取各环数据
+        self.GuiRefresh(self.Status, 'Loading Data')
+        Chpath = self.Path.toPlainText()
+        Chpath = Chpath.replace('/', '\\')
+
+        # 判断文件名类型（中文或英文）
+        if Chpath.find('环') > 0:
+            C = True
+        elif Chpath.find('-Ch') > 0:
+            C = False
+
+        Chvalues = []
+        for i in range(1, Ch + 1):
+            match = re.match(r'^(.*?)-\d+环\.dat$', Chpath)
+            if match:
+                prefix = match.group(1)
+                datakword = f"{prefix}-{i}环.dat" if C else f"{prefix}-Ch{i}.dat"
+
+            wbd = self.xwapp.books.open(datakword)
+            rawsheet = wbd.sheets[0]
+            Chvalues.append(rawsheet.range(rawsheet.used_range).value)
+            self.GuiRefresh(self.Status, 'Loading Single Ring Data' + str(i))
+            wbd.close()
+
+        Chvalues = np.asarray(Chvalues)
+        return Chvalues, Ch, C, Chpath
+
+    def process_temperature_data(self, Chpath, C):
+        """
+        处理温度数据
+
+        Args:
+            Chpath: 数据文件路径
+            C: 是否为中文文件名
+
+        Returns:
+            tuple: (Tempvalue, Temptitle) 温度数据和标题
+        """
+        Tempvalue = []
+        Temptitle = []
+
+        if self.TempCheckBox.isChecked():
+            self.GuiRefresh(self.Status, 'Loading Temperature Data')
+            temppath = os.path.split(Chpath)[0]
+            tempfilekwords = '温度' if C else 'Temperature'
+            wbt = self.xwapp.books.open(self.FilePath(temppath, tempfilekwords))
+            tempsheet = wbt.sheets[0]
+            Tempvalue = tempsheet.range(tempsheet.used_range).value
+            Temptitle = Tempvalue[0][:]
+            Tempvalue = Tempvalue[1:][:]
+            Temptitle = np.asarray(Temptitle)
+            Tempvalue = np.asarray(Tempvalue)
+            wbt.close()
+
+        return Tempvalue, Temptitle
+
+    def parse_experiment_info(self, Chpath):
+        """
+        解析实验信息文件
+
+        Args:
+            Chpath: 数据文件路径
+
+        Returns:
+            dict: 实验信息字典，如果没有找到文件则返回None
+        """
+        filePath = os.path.dirname(Chpath)
+        txtFiles = list(Path(filePath).glob('*.txt'))  # 获取所有 .txt 文件列表
+
+        if txtFiles:
+            # 读取第一个txt文件
+            text = Path(txtFiles[0]).read_text(encoding='utf-8')
+            expInfo = self.parseText(text)
+            return expInfo
+        else:
+            # 没有txt文件，跳过
+            return None
+
+    def calculate_base_data(self, Chvalues, Ch, wn, m):
+        """
+        计算基准周期的单环和差分数据
+
+        Args:
+            Chvalues: 各环数据数组
+            Ch: 环数
+            wn: 波长数量
+            m: 每次测量数加一
+
+        Returns:
+            tuple: (basesingle, basediff) 基准单环数据和基准差分数据
+        """
+        self.GuiRefresh(self.Status, 'Calculating Base Data')
+        basesingle = np.zeros((Ch, wn))  # 波长列数，环数行数
+        diffNo = int(Ch * (Ch - 1) // 2)
+        basediff = np.zeros((diffNo, wn))
+
+        for w in range(0, wn):
+            cs = -1
+            for r in range(0, Ch):
+                basesingle[r][w] = sum(Chvalues[r][(self.BaseCycle.value() - 1) * 6 + w][1:m - 1]) / (m - 2)
+                for rl in range(r + 1, Ch):
+                    cs = cs + 1
+                    basediff[cs][w] = sum(np.log(Chvalues[r][(self.BaseCycle.value() - 1) * 6 + w][1:m - 1] / Chvalues[rl][(self.BaseCycle.value() - 1) * 6 + w][1:m - 1])) / (m - 2)
+
+        return basesingle, basediff
+
+    def create_excel_workbook(self, Chpath, C):
+        """
+        创建Excel工作簿和工作表
+
+        Args:
+            Chpath: 数据文件路径
+            C: 是否为中文文件名
+
+        Returns:
+            xlwings.Book: Excel工作簿对象
+        """
+        self.GuiRefresh(self.Status, 'Creating Output File')
+        ProcessFilePath = os.path.join(Chpath.replace(Chpath.split('\\')[-1], ''),
+                                       Chpath.split('\\')[-2] + '.xlsx') if C else (
+                                       Chpath.split('Ch')[0] + 'Processed' + '.xlsx')
+
+        if os.path.isfile(ProcessFilePath) == False:
+            wb = self.xwapp.books.add()  # 在app下创建一个Book
+            wb.save(ProcessFilePath)
+        wb = self.xwapp.books.open(ProcessFilePath)
+
+        # 创建工作表
+        sheetnames = ['单环', '单环吸光度', '单环信噪比', '差分', '差分吸光度', '差分等效信噪比',
+                      '光强和信噪比汇总', '温度数据'] if C else ['Single Ring', 'Single Ring Absorbance',
+                                                                     'Single SNR', 'Differential',
+                                                                     'Differential Absorbance', 'Differential SNR',
+                                                                     'Summary of Intensity and SNR', 'Temperature']
+        self.GuiRefresh(self.Status, 'Creating Sheets')
+        if self.TempCheckBox.isChecked():
+            sheetNo = len(sheetnames)
+        else:
+            sheetNo = len(sheetnames) - 1
+
+        for i in range(0, sheetNo):
+            if self.CheckSheet(wb, sheetnames[i]) == False:
+                wb.sheets.add(sheetnames[i], after=i + 1)
+        wb.save()
+
+        return wb, sheetnames
+
+    def write_time_and_headers(self, wb, sheetnames, timearr, cycleNoarr):
+        """
+        在所有工作表中写入时间和序号标题
+
+        Args:
+            wb: Excel工作簿对象
+            sheetnames: 工作表名称列表
+            timearr: 时间数组
+            cycleNoarr: 周期序号数组
+        """
+        self.GuiRefresh(self.Status, 'Writing Title')
+        for s in range(0, 6):
+            wb.sheets[sheetnames[s]].range(3, 1).value = timearr
+            wb.sheets[sheetnames[s]].range(3, 2).value = cycleNoarr
+
+    def process_temperature_interpolation(self, wb, sheetnames, timearr, cycleNoarr, Tempvalue, Temptitle):
+        """
+        处理温度数据插值并写入Excel
+
+        Args:
+            wb: Excel工作簿对象
+            sheetnames: 工作表名称列表
+            timearr: 时间数组
+            cycleNoarr: 周期序号数组
+            Tempvalue: 温度数据
+            Temptitle: 温度数据标题
+
+        Returns:
+            numpy.array: 插值后的温度数据
+        """
+        try:
+            yinterp = np.empty((timearr.shape[0], Tempvalue.shape[1] - 1))
+        except:
+            yinterp = np.empty((timearr.shape[0], 1))
+
+        if self.TempCheckBox.isChecked():
+            wb.sheets[sheetnames[len(sheetnames) - 1]].range(2, 1).value = timearr
+            wb.sheets[sheetnames[len(sheetnames) - 1]].range(2, 2).value = cycleNoarr
+            wb.sheets[sheetnames[len(sheetnames) - 1]].range(1, 2).value = Temptitle
+            for i in range(1, Tempvalue.shape[1]):
+                yinterp[:, i - 1] = np.interp(timearr, Tempvalue[:, 0], Tempvalue[:, i]).reshape(timearr.shape[0], )
+            wb.sheets[sheetnames[len(sheetnames) - 1]].range(2, 3).value = yinterp
+            self.GuiRefresh(self.Status, 'Writing Temp Data')
+        wb.save()
+
+        return yinterp
+
+    def write_summary_data(self, wb, sheetnames, wave, ringwords, diffwords, Ch, C):
+        """
+        写入光强和信噪比数据汇总的标题
+
+        Args:
+            wb: Excel工作簿对象
+            sheetnames: 工作表名称列表
+            wave: 波长列表
+            ringwords: 环标签列表
+            diffwords: 差分标签列表
+            Ch: 环数
+            C: 是否为中文文件名
+        """
+        self.GuiRefresh(self.Status, 'Writing Summary Data')
+        wb.sheets[sheetnames[6]].range(3, 3).value = '光强' if C else 'Intensity'
+        wb.sheets[sheetnames[6]].range(3, 13).value = '信噪比' if C else 'SNR'
+        wb.sheets[sheetnames[6]].range(4, 5).value = wave
+        wb.sheets[sheetnames[6]].range(4, 15).value = wave
+        wb.sheets[sheetnames[6]].range(5, 4).options(transpose=True).value = ringwords
+        wb.sheets[sheetnames[6]].range(5, 14).options(transpose=True).value = ringwords
+        wb.sheets[sheetnames[6]].range(5 + Ch, 4).options(transpose=True).value = diffwords
+        wb.sheets[sheetnames[6]].range(5 + Ch, 14).options(transpose=True).value = diffwords
+        wb.save()
+
+    def process_single_ring_data(self, wb, sheetnames, Chvalues, Ch, ringwords, wave, datarange, basesingle, n, wn, m):
+        """
+        处理单环数据并写入Excel
+
+        Args:
+            wb: Excel工作簿对象
+            sheetnames: 工作表名称列表
+            Chvalues: 各环数据数组
+            Ch: 环数
+            ringwords: 环标签列表
+            wave: 波长列表
+            datarange: 数据范围
+            basesingle: 基准单环数据
+            n: 数据行数
+            wn: 波长数量
+            m: 每次测量数加一
+        """
+        for r in range(0, Ch):
+            # 写入数据头
+            for s in range(0, 3):
+                wb.sheets[sheetnames[s]].range(1, 3 + 7 * r).value = ringwords[r]
+                wb.sheets[sheetnames[s]].range(2, 4 + 7 * r).value = wave
+
+            # 计算各列数据
+            self.GuiRefresh(self.Status, 'Writing Ring ' + str(r + 1))
+            singlearr = []
+            singleabsarr = []
+            singlesnrarr = []
+
+            for j in datarange:  # len(Chvalues[0])或者n
+                singles = Chvalues[r][j][1:m - 1]
+                single = sum(singles) / (m - 2)
+                singleabs = np.log(basesingle[r][j % 6] / single)
+                singlesnr = single / np.std(singles, ddof=1)
+                singlearr.append(single)
+                singleabsarr.append(singleabs)
+                singlesnrarr.append(singlesnr)
+
+            singlearr = np.array([singlearr]).reshape(n // wn, wn)
+            singleabsarr = np.array([singleabsarr]).reshape(n // wn, wn)
+            singlesnrarr = np.array([singlesnrarr]).reshape(n // wn, wn)
+            singleave = singlearr.mean(axis=0)
+            singlesnrave = singlesnrarr.mean(axis=0)
+
+            # 写入数据
+            wb.sheets[sheetnames[0]].range(3, 4 + 7 * r).value = singlearr
+            wb.sheets[sheetnames[1]].range(3, 4 + 7 * r).value = singleabsarr
+            wb.sheets[sheetnames[2]].range(3, 4 + 7 * r).value = singlesnrarr
+            wb.sheets[sheetnames[6]].range(5 + r, 5).value = singleave
+            wb.sheets[sheetnames[6]].range(5 + r, 15).value = singlesnrave
+
+            self.currenttime = datetime.datetime.now()
+            self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
+
+        wb.save()
+        self.GuiRefresh(self.Status, 'Writing Single Finished')
+
+    def process_differential_data(self, wb, sheetnames, Chvalues, Ch, diffwords, wave, datarange, basediff, n, wn, m):
+        """
+        处理差分数据并写入Excel
+
+        Args:
+            wb: Excel工作簿对象
+            sheetnames: 工作表名称列表
+            Chvalues: 各环数据数组
+            Ch: 环数
+            diffwords: 差分标签列表
+            wave: 波长列表
+            datarange: 数据范围
+            basediff: 基准差分数据
+            n: 数据行数
+            wn: 波长数量
+            m: 每次测量数加一
+        """
+        cs = -1
+        for r in range(0, Ch):
+            for rl in range(r + 1, Ch):
+                # 写入数据头
+                cs = cs + 1
+                for s in range(3, 6):
+                    wb.sheets[sheetnames[s]].range(1, 3 + 7 * cs).value = diffwords[cs]
+                    wb.sheets[sheetnames[s]].range(2, 4 + 7 * cs).value = wave
+
+                # 计算各列数据
+                self.GuiRefresh(self.Status, 'Writing Diff ' + str(r + 1) + str(rl + 1))
+                diffarr = np.empty((n, 1))
+                diffabsarr = np.empty((n, 1))
+                diffsnrarr = np.empty((n, 1))
+
+                for j in datarange:  # len(Chvalues[0])或者n
+                    diffs = np.log(Chvalues[r][j][1:m - 1] / Chvalues[rl][j][1:m - 1])
+                    diff = sum(diffs) / (m - 2)
+                    diffabs = diff - basediff[cs][j % 6]
+                    diffsnr = 1 / np.std(diffs, ddof=1)
+                    diffarr[j] = diff
+                    diffabsarr[j] = diffabs
+                    diffsnrarr[j] = diffsnr
+
+                diffarr = diffarr.reshape(n // wn, wn)
+                diffabsarr = np.array([diffabsarr]).reshape(n // wn, wn)
+                diffsnrarr = diffsnrarr.reshape(n // wn, wn)
+                diffarrave = diffarr.mean(axis=0)
+                diffsnrave = diffsnrarr.mean(axis=0)
+
+                # 写入数据
+                wb.sheets[sheetnames[3]].range(3, 4 + 7 * cs).value = diffarr
+                wb.sheets[sheetnames[4]].range(3, 4 + 7 * cs).value = diffabsarr
+                wb.sheets[sheetnames[5]].range(3, 4 + 7 * cs).value = diffsnrarr
+                wb.sheets[sheetnames[6]].range(5 + Ch + cs, 5).value = diffarrave
+                wb.sheets[sheetnames[6]].range(5 + Ch + cs, 15).value = diffsnrave
+
+                self.currenttime = datetime.datetime.now()
+                self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
+
+        wb.save()
+        self.GuiRefresh(self.Status, 'Writing Diff Finished')
+
+    def handle_dynamic_base_cycle(self, wb, sheetnames, Ch, n, wn, C):
+        """
+        处理动态基准周期功能
+
+        Args:
+            wb: Excel工作簿对象
+            sheetnames: 工作表名称列表
+            Ch: 环数
+            n: 数据行数
+            wn: 波长数量
+            C: 是否为中文文件名
+        """
+        if self.DyBCCheckBox.isChecked():
+            wb.sheets[sheetnames[1]].range(3, 3).value = '单环基准周期' if C else 'Single Base Cycle'
+            wb.sheets[sheetnames[1]].range(4, 3).value = self.BaseCycle.value()
+            wb.sheets[sheetnames[4]].range(3, 3).value = '差分基准周期' if C else 'Single Base Cycle'
+            wb.sheets[sheetnames[4]].range(4, 3).value = self.BaseCycle.value()
+
+            # 生成动态公式
+            ss = '=LN(@INDIRECT("' + wb.sheets[
+                sheetnames[0]].name + '!"&SUBSTITUTE(ADDRESS(1,COLUMN(),4),1,"")&($C$4+2))/@INDIRECT("' + wb.sheets[
+                     sheetnames[0]].name + '!"&SUBSTITUTE(ADDRESS(1,COLUMN(),4),1,"")&ROW()))'
+            singleabsarr = np.full((n // wn, wn), ss)
+            ds = '=@INDIRECT("' + wb.sheets[
+                sheetnames[3]].name + '!"&SUBSTITUTE(ADDRESS(1,COLUMN(),4),1,"")&ROW())-@INDIRECT("' + wb.sheets[
+                     sheetnames[3]].name + '!"&SUBSTITUTE(ADDRESS(1,COLUMN(),4),1,"")&($C$4+2))'
+            diffabsarr = np.full((n // wn, wn), ds)
+
+            # 写入动态公式
+            for r in range(0, Ch):
+                self.GuiRefresh(self.Status, 'Writing Dyna Ring ' + str(r + 1))
+                wb.sheets[sheetnames[1]].range(3, 4 + 7 * r).value = singleabsarr
+            for rl in range(0, int(Ch * (Ch - 1) / 2)):
+                self.GuiRefresh(self.Status, 'Writing Dyna Diff ' + str(rl + 1))
+                wb.sheets[sheetnames[4]].range(3, 4 + 7 * rl).value = diffabsarr
+                self.currenttime = datetime.datetime.now()
+                self.GuiRefresh(self.ErrorText,
+                                'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
+            self.GuiRefresh(self.Status, 'Saving...')
+            wb.save()
+
+    def add_glucose_data(self, wb, sheetnames, timearr, yinterp, C):
+        """
+        添加血糖数据到Excel
+
+        Args:
+            wb: Excel工作簿对象
+            sheetnames: 工作表名称列表
+            timearr: 时间数组
+            yinterp: 插值后的温度数据
+            C: 是否为中文文件名
+
+        Returns:
+            int: 血糖数据列的索引
+        """
+        try:
+            rng_lcol = len(yinterp[1]) + 2
+        except:
+            print("No temperature data")
+            rng_lcol = 2
+
+        # 添加血糖数据
+        wb.sheets[sheetnames[7]].range(1, rng_lcol + 2).value = '血糖值' if C else 'Glucose Value'
+        wb.sheets[sheetnames[7]].range(2, rng_lcol + 1).value = timearr[0]
+        wb.sheets[sheetnames[7]].range(3, rng_lcol + 1).value = timearr[int(len(timearr) / 2)]
+        wb.sheets[sheetnames[7]].range(4, rng_lcol + 1).value = timearr[int(len(timearr) - 1)]
+        wb.sheets[sheetnames[7]].range(2, rng_lcol + 2).value = 5.5
+        wb.sheets[sheetnames[7]].range(3, rng_lcol + 2).value = 10.5
+        wb.sheets[sheetnames[7]].range(4, rng_lcol + 2).value = 5.5
+
+        # 设置时间格式
+        gcols = xw.utils.col_name(rng_lcol + 1) + ':' + xw.utils.col_name(rng_lcol + 1)
+        wb.sheets[sheetnames[7]].api.Columns(gcols).NumberFormatLocal = "[$-x-systime]h:mm:ss AM/PM"
+
+        return rng_lcol
+
+    def create_charts(self, wb, sheetnames, timearr, wave, Ch, wn, rng_lcol, expInfo, Chpath, C):
+        """
+        创建图表
+
+        Args:
+            wb: Excel工作簿对象
+            sheetnames: 工作表名称列表
+            timearr: 时间数组
+            wave: 波长列表
+            Ch: 环数
+            wn: 波长数量
+            rng_lcol: 血糖数据列索引
+            expInfo: 实验信息
+            Chpath: 数据文件路径
+            C: 是否为中文文件名
+        """
+        if not self.PLTCheckBox.isChecked():
+            return
+
+        # 设置时间格式
+        for i in range(0, len(sheetnames)):
+            wb.sheets[sheetnames[i]].api.Columns("A:A").NumberFormatLocal = "[$-x-systime]h:mm:ss AM/PM"
+
+        # 重置图表列表
+        self.charts = []
+
+        # 图表配置信息
+        charttitles = ['12环差分信号vs.室温', '23环差分信号vs.测头旁皮肤温度',
+                       '1050nm单环吸光度', '1219nm单环吸光度',
+                       '34环差分信号vs.加热功率', '45环差分信号vs.测头下实际温度',
+                       '1314nm单环吸光度', '1409nm单环吸光度',
+                       '1050nm差分吸光度vs.测头下实际温度', '1550nm差分吸光度 - 1050nm差分吸光度',
+                       '1550nm单环吸光度', '1609nm单环吸光度']
+
+        ringsindex = ['Diff12', 'Diff23', '1050', '1219',
+                      'Diff34', 'Diff45', '1314', '1409',
+                      'Diff1050', 'Diff1550-Diff1050', '1550', '1609']
+
+        tempindex = ['4', '5', '0', '0',
+                     '15', '12', '0', '0',
+                     '12', '0', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
+
+        infoindex = [False, False, False, False,
+                     True, True, True, True,
+                     False, False, False, False]
+
+        if self.OGTTCheckBox.isChecked():  # OGTT时的血糖值绘制准备
+            tempindex[5] = str(rng_lcol + 2)
+            tempindex[10] = str(rng_lcol + 2)
+            charttitles[5] = '45环差分信号vs.血糖真值'
+            charttitles[10] = '1550nm单环吸光度vs.血糖真值'
+
+        pltN = len(charttitles)
+        SRRange = 'A1:ZZ2'
+        diffSheet = wb.sheets[sheetnames[4]]
+        sglSheet = wb.sheets[sheetnames[1]]
+        tempSheet = wb.sheets[sheetnames[7]]
+
+        # 创建图表的详细实现
+        self._create_individual_charts(wb, sheetnames, charttitles, ringsindex, tempindex, infoindex,
+                                       wave, Ch, wn, timearr, expInfo, Chpath, C, rng_lcol, pltN, SRRange,
+                                       diffSheet, sglSheet, tempSheet)
+
+    # 数据处理主函数
     def DataProcess(self):
+        """
+        数据处理主函数
+
+        执行完整的数据处理流程，包括：
+        1. 数据加载和验证
+        2. 温度数据处理
+        3. 实验信息解析
+        4. 基础数据计算
+        5. Excel文件生成
+        6. 图表绘制
+        """
         try:
             self.Process.setEnabled(False)
             self.starttime = datetime.datetime.now()
             self.GuiRefresh(self.ErrorText, '')
-            # 先确定路径
-            if self.Path.toPlainText() == '':
-                self.GuiRefresh(self.Status, 'Obtaining File Path')
-                path = os.getcwd()  # 这是当前文件位置
-                filekwords = self.Original.currentText() + ')-' + 'Ch1.dat'
-                if self.Original.currentText() == 'Calibrated':
-                    filekwordsC = '校准后' + ')-' + '1环.dat'
-                elif self.Original.currentText() == 'Original':
-                    filekwordsC = '原始值' + ')-' + '1环.dat'
-                self.Path.setPlainText(max(self.FilePath(path, filekwords), self.FilePath(path, filekwordsC)))
-            # 确定环数
-            if self.Rings.currentText() == '5 Rings':
-                Ch = 5
-            elif self.Rings.currentText() == '7 Rings':
-                Ch = 7
-            # 获取基本数据
-            # 获取各环数据
-            self.GuiRefresh(self.Status, 'Loading Data')
-            Chpath = self.Path.toPlainText()
-            Chpath = Chpath.replace('/', '\\')
-            if Chpath.find('环') > 0:
-                C = True
-            elif Chpath.find('-Ch') > 0:
-                C = False
-            Chvalues = []
-            for i in range(1, Ch + 1):
-                match = re.match(r'^(.*?)-\d+环\.dat$', Chpath)
-                if match:
-                    prefix = match.group(1)
-                    datakword = f"{prefix}-{i}环.dat" if C else f"{prefix}-Ch{i}.dat"
 
-                wbd = self.xwapp.books.open(datakword)
-                rawsheet = wbd.sheets[0]
-                Chvalues.append(rawsheet.range(rawsheet.used_range).value)
-                self.GuiRefresh(self.Status, 'Loading Single Ring Data' + str(i))
-                wbd.close()
-            Chvalues = np.asarray(Chvalues)
+            # 1. 加载和验证数据
+            Chvalues, Ch, C, Chpath = self.load_and_validate_data()
             self.currenttime = datetime.datetime.now()
             self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
 
-            # 获取温度数据
-            Tempvalue = []
-            if self.TempCheckBox.isChecked() == True:
-                self.GuiRefresh(self.Status, 'Loading Temperature Data')
-                temppath = os.path.split(self.Path.toPlainText())[0]
-                tempfilekwords = '温度' if C else 'Temperature'
-                wbt = self.xwapp.books.open(self.FilePath(temppath, tempfilekwords))
-                tempsheet = wbt.sheets[0]
-                Tempvalue = tempsheet.range(tempsheet.used_range).value
-                Temptitle = Tempvalue[0][:]
-                Tempvalue = Tempvalue[1:][:]
-                Temptitle = np.asarray(Temptitle)
-                Tempvalue = np.asarray(Tempvalue)
+            # 2. 处理温度数据
+            Tempvalue, Temptitle = self.process_temperature_data(Chpath, C)
 
-            # 获取标志信息
-            filePath = os.path.dirname(Chpath)
-            txtFiles = list(Path(filePath).glob('*.txt'))  # 获取所有 .txt 文件列表
-            if txtFiles:
-                # 读取第一个txt文件
-                text = Path(txtFiles[0]).read_text(encoding='utf-8')
-                expInfo = self.parseText(text)
-            else:
-                # 没有txt文件，跳过
-                pass
+            # 3. 解析实验信息
+            expInfo = self.parse_experiment_info(Chpath)
 
-            # 先把其他基本数据计算好（时间、序列）
+            # 4. 计算基本数据（时间、序列、波长等）
             n = len(Chvalues[0])  # 单环数据行数
             m = len(Chvalues[0][0])  # 每次测量数加一（最后一列是时间）
             datarange = [i for i in range(n)]
-            if self.LDCheckBox.isChecked() == True:
+
+            # 根据LD选项确定波长
+            if self.LDCheckBox.isChecked():
                 wave = ['1064', '1310', '1390', '1550', '1625']
                 for i in range(len(datarange) - 1, -1, -1):
                     if (datarange[i] % 6 == 5):
                         del datarange[i]
             else:
                 wave = ['1050', '1219', '1314', '1409', '1550', '1609']
+
             n = len(datarange)
             wn = len(wave)
             self.currenttime = datetime.datetime.now()
             self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
-            # 单环和差分环的数组
+
+            # 生成环和差分标签
             ringwords = []
             diffwords = []
             cs = -1
@@ -302,565 +891,50 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
                 timearr[l] = timeele
                 cycleNoarr[l] = l + 1
 
-            # 提前算好基准周期单环和差分数据
-            self.GuiRefresh(self.Status, 'Calculating Base Data')
-            basesingle = np.zeros((Ch, wn))  # 6列（波长）环数行（环）
-            diffNo = int(Ch * (Ch - 1) // 2)
-            basediff = np.zeros((diffNo, wn))
-            for w in range(0, wn):
-                cs = -1
-                for r in range(0, Ch):
-                    basesingle[r][w] = sum(Chvalues[r][(self.BaseCycle.value() - 1) * 6 + w][1:m - 1]) / (m - 2)
-                    for rl in range(r + 1, Ch):
-                        cs = cs + 1
-                        basediff[cs][w] = sum(np.log(Chvalues[r][(self.BaseCycle.value() - 1) * 6 + w][1:m - 1] / Chvalues[rl][(self.BaseCycle.value() - 1) * 6 + w][1:m - 1])) / (m - 2)
+            # 5. 计算基准周期数据
+            basesingle, basediff = self.calculate_base_data(Chvalues, Ch, wn, m)
 
-            # 新建文件，用以放置处理好的数据，先判断文件是否存在，新建文件，打开，再判断sheet是否存在，如否，新建sheet
-            # self.filestarttime=datetime.datetime.now()
-            self.GuiRefresh(self.Status, 'Creating Output File')
-            ProcessFilePath = os.path.join(Chpath.replace(Chpath.split('\\')[-1], ''),
-                                           Chpath.split('\\')[-2] + '.xlsx') if C else (
-                                           Chpath.split('Ch')[0] + 'Processed' + '.xlsx')
-            if os.path.isfile(ProcessFilePath) == False:
-                wb = self.xwapp.books.add()  # 在app下创建一个Book
-                wb.save(ProcessFilePath)
-            wb = self.xwapp.books.open(ProcessFilePath)
-            # 新建sheet
-            sheetnames = ['单环', '单环吸光度', '单环信噪比', '差分', '差分吸光度', '差分等效信噪比',
-                          '光强和信噪比汇总', '温度数据'] if C else ['Single Ring', 'Single Ring Absorbance',
-                                                                     'Single SNR', 'Differential',
-                                                                     'Differential Absorbance', 'Differential SNR',
-                                                                     'Summary of Intensity and SNR', 'Temperature']
-            self.GuiRefresh(self.Status, 'Creating Sheets')
-            if self.TempCheckBox.isChecked() == True:
-                sheetNo = len(sheetnames)
-            else:
-                sheetNo = len(sheetnames) - 1
-            for i in range(0, sheetNo):
-                if self.CheckSheet(wb, sheetnames[i]) == False:
-                    wb.sheets.add(sheetnames[i], after=i + 1)
-            wb.save()
+            # 6. 创建Excel工作簿和工作表
+            wb, sheetnames = self.create_excel_workbook(Chpath, C)
             self.currenttime = datetime.datetime.now()
             self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
 
-            # 下面正式处理数据
-            # 先统一在所有sheet中写入时间和序号
-            # self.titlestarttime=datetime.datetime.now()
-            self.GuiRefresh(self.Status, 'Writing Title')
-            for s in range(0, 6):
-                wb.sheets[sheetnames[s]].range(3, 1).value = timearr
-                wb.sheets[sheetnames[s]].range(3, 2).value = cycleNoarr
+            # 7. 写入时间和标题
+            self.write_time_and_headers(wb, sheetnames, timearr, cycleNoarr)
             self.currenttime = datetime.datetime.now()
             self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
 
-            # 接下来进行温度插值和写入
-            # self.tempstarttime=datetime.datetime.now()
-            try:
-                yinterp = np.empty((timearr.shape[0], Tempvalue.shape[1] - 1))
-            except:
-                yinterp = np.empty((timearr.shape[0], 1))
-
-            if self.TempCheckBox.isChecked():
-                wb.sheets[sheetnames[len(sheetnames) - 1]].range(2, 1).value = timearr
-                wb.sheets[sheetnames[len(sheetnames) - 1]].range(2, 2).value = cycleNoarr
-                wb.sheets[sheetnames[len(sheetnames) - 1]].range(1, 2).value = Temptitle
-                Tempvalue.shape
-                for i in range(1, Tempvalue.shape[1]):
-                    yinterp[:, i - 1] = np.interp(timearr, Tempvalue[:, 0], Tempvalue[:, i]).reshape(timearr.shape[0], )
-                wb.sheets[sheetnames[len(sheetnames) - 1]].range(2, 3).value = yinterp
-                self.GuiRefresh(self.Status, 'Writing Temp Data')
-            wb.save()
+            # 8. 处理温度数据插值
+            yinterp = self.process_temperature_interpolation(wb, sheetnames, timearr, cycleNoarr, Tempvalue, Temptitle)
             self.currenttime = datetime.datetime.now()
             self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
 
-            # 接下来写入光强和信噪比数据汇总的题头
-            self.GuiRefresh(self.Status, 'Writing Summery Data')
-            wb.sheets[sheetnames[6]].range(3, 3).value = '光强' if C else 'Intensity'
-            wb.sheets[sheetnames[6]].range(3, 13).value = '信噪比' if C else 'SNR'
-            wb.sheets[sheetnames[6]].range(4, 5).value = wave
-            wb.sheets[sheetnames[6]].range(4, 15).value = wave
-            wb.sheets[sheetnames[6]].range(5, 4).options(transpose=True).value = ringwords
-            wb.sheets[sheetnames[6]].range(5, 14).options(transpose=True).value = ringwords
-            wb.sheets[sheetnames[6]].range(5 + Ch, 4).options(transpose=True).value = diffwords
-            wb.sheets[sheetnames[6]].range(5 + Ch, 14).options(transpose=True).value = diffwords
-            wb.save()
+            # 9. 写入汇总数据标题
+            self.write_summary_data(wb, sheetnames, wave, ringwords, diffwords, Ch, C)
 
-            # 单环数据和单环吸光度数据
-            # self.singstarttime=datetime.datetime.now()
-            # =LN(@INDIRECT("单环!"&SUBSTITUTE(ADDRESS(1,COLUMN(),4),1,"")&($C$4+2))/@INDIRECT("单环!"&SUBSTITUTE(ADDRESS(1,COLUMN(),4),1,"")&ROW()))
-            for r in range(0, Ch):
-                # 数据头
-                for s in range(0, 3):
-                    wb.sheets[sheetnames[s]].range(1, 3 + 7 * r).value = ringwords[r]
-                    wb.sheets[sheetnames[s]].range(2, 4 + 7 * r).value = wave
-                # 各列数据
-                self.GuiRefresh(self.Status, 'Writing Ring ' + str(r + 1))
-                singlearr = []
-                singleabsarr = []
-                singlesnrarr = []
-                for j in datarange:  # len(Chvalues[0])或者n
-                    singles = Chvalues[r][j][1:m - 1]
-                    single = sum(singles) / (m - 2)
-                    singleabs = np.log(basesingle[r][j % 6] / single)
-                    singlesnr = single / np.std(singles, ddof=1)
-                    singlearr.append(single)
-                    singleabsarr.append(singleabs)
-                    singlesnrarr.append(singlesnr)
-                singlearr = np.array([singlearr]).reshape(n // wn, wn)
-                singleabsarr = np.array([singleabsarr]).reshape(n // wn, wn)
-                singlesnrarr = np.array([singlesnrarr]).reshape(n // wn, wn)
-                singleave = singlearr.mean(axis=0)
-                singlesnrave = singlesnrarr.mean(axis=0)
-                wb.sheets[sheetnames[0]].range(3, 4 + 7 * r).value = singlearr
-                wb.sheets[sheetnames[1]].range(3, 4 + 7 * r).value = singleabsarr
-                wb.sheets[sheetnames[2]].range(3, 4 + 7 * r).value = singlesnrarr
-                wb.sheets[sheetnames[6]].range(5 + r, 5).value = singleave
-                wb.sheets[sheetnames[6]].range(5 + r, 15).value = singlesnrave
-                self.currenttime = datetime.datetime.now()
-                self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
-            wb.save()
-            self.GuiRefresh(self.Status, 'Writing Single Finished')
+            # 10. 处理单环数据
+            self.process_single_ring_data(wb, sheetnames, Chvalues, Ch, ringwords, wave, datarange, basesingle, n, wn, m)
 
-            # 差分数据和差分吸光度数据，也加入了数据汇总的数据
-            # =@INDIRECT("差分!"&SUBSTITUTE(ADDRESS(1,COLUMN(),4),1,"")&ROW())-@INDIRECT("差分!"&SUBSTITUTE(ADDRESS(1,COLUMN(),4),1,"")&($C$4+2))
-            cs = -1
-            for r in range(0, Ch):
-                for rl in range(r + 1, Ch):
-                    # 数据头
-                    cs = cs + 1
-                    for s in range(3, 6):
-                        wb.sheets[sheetnames[s]].range(1, 3 + 7 * cs).value = diffwords[cs]
-                        wb.sheets[sheetnames[s]].range(2, 4 + 7 * cs).value = wave
-                    # 各列数据
-                    self.GuiRefresh(self.Status, 'Writing Diff ' + str(r + 1) + str(rl + 1))
-                    diffarr = np.empty((n, 1))
-                    diffabsarr = np.empty((n, 1))
-                    diffsnrarr = np.empty((n, 1))
-                    for j in datarange:  # len(Chvalues[0])或者n
-                        diffs = np.log(Chvalues[r][j][1:m - 1] / Chvalues[rl][j][1:m - 1])
+            # 11. 处理差分数据
+            self.process_differential_data(wb, sheetnames, Chvalues, Ch, diffwords, wave, datarange, basediff, n, wn, m)
 
-                        diff = sum(diffs) / (m - 2)
-                        diffabs = diff - basediff[cs][j % 6]
-                        diffsnr = 1 / np.std(diffs, ddof=1)
-                        # diff = np.array([sum(diffs)/(m-2)])
-                        # diffsnr = np.array([1/np.std(diffs, ddof=1)])
-                        # diffabs = np.array(diff-basediff[cs][j%6])
-                        diffarr[j] = diff
-                        diffabsarr[j] = diffabs
-                        diffsnrarr[j] = diffsnr
-                        # diffarr = np.concatenate((diffarr, diff),axis=0)
-                        # diffabsarr = np.concatenate((diffabsarr, diffabs),axis=0)
-                        # diffsnrarr = np.concatenate((diffsnrarr, diffsnr),axis=0)
+            # 12. 处理动态基准周期
+            self.handle_dynamic_base_cycle(wb, sheetnames, Ch, n, wn, C)
 
-                    diffarr = diffarr.reshape(n // wn, wn)
-                    diffabsarr = np.array([diffabsarr]).reshape(n // wn, wn)
-                    diffsnrarr = diffsnrarr.reshape(n // wn, wn)
-                    diffarrave = diffarr.mean(axis=0)
-                    diffsnrave = diffsnrarr.mean(axis=0)
-                    wb.sheets[sheetnames[3]].range(3, 4 + 7 * cs).value = diffarr
-                    wb.sheets[sheetnames[4]].range(3, 4 + 7 * cs).value = diffabsarr
-                    wb.sheets[sheetnames[5]].range(3, 4 + 7 * cs).value = diffsnrarr
-                    wb.sheets[sheetnames[6]].range(5 + Ch + cs, 5).value = diffarrave
-                    wb.sheets[sheetnames[6]].range(5 + Ch + cs, 15).value = diffsnrave
-                    self.currenttime = datetime.datetime.now()
-                    self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
-            wb.save()
-            self.GuiRefresh(self.Status, 'Writing Diff Finished')
+            # 13. 添加血糖数据
+            rng_lcol = self.add_glucose_data(wb, sheetnames, timearr, yinterp, C)
 
-            if self.DyBCCheckBox.isChecked() == True:
-                wb.sheets[sheetnames[1]].range(3, 3).value = '单环基准周期' if C else 'Single Base Cycle'
-                wb.sheets[sheetnames[1]].range(4, 3).value = self.BaseCycle.value()
-                wb.sheets[sheetnames[4]].range(3, 3).value = '差分基准周期' if C else 'Single Base Cycle'
-                wb.sheets[sheetnames[4]].range(4, 3).value = self.BaseCycle.value()
-                ss = '=LN(@INDIRECT("' + wb.sheets[
-                    sheetnames[0]].name + '!"&SUBSTITUTE(ADDRESS(1,COLUMN(),4),1,"")&($C$4+2))/@INDIRECT("' + wb.sheets[
-                         sheetnames[0]].name + '!"&SUBSTITUTE(ADDRESS(1,COLUMN(),4),1,"")&ROW()))'
-                singleabsarr = np.full((n // wn, wn), ss)
-                ds = '=@INDIRECT("' + wb.sheets[
-                    sheetnames[3]].name + '!"&SUBSTITUTE(ADDRESS(1,COLUMN(),4),1,"")&ROW())-@INDIRECT("' + wb.sheets[
-                         sheetnames[3]].name + '!"&SUBSTITUTE(ADDRESS(1,COLUMN(),4),1,"")&($C$4+2))'
-                diffabsarr = np.full((n // wn, wn), ds)
-                for r in range(0, Ch):
-                    self.GuiRefresh(self.Status, 'Writing Dyna Ring ' + str(r + 1))
-                    wb.sheets[sheetnames[1]].range(3, 4 + 7 * r).value = singleabsarr
-                for rl in range(0, int(Ch * (Ch - 1) / 2)):
-                    # 数据头
-                    self.GuiRefresh(self.Status, 'Writing Dyna Diff ' + str(rl + 1))
-                    wb.sheets[sheetnames[4]].range(3, 4 + 7 * rl).value = diffabsarr
-                    self.currenttime = datetime.datetime.now()
-                    self.GuiRefresh(self.ErrorText,
-                                    'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
-                self.GuiRefresh(self.Status, 'Saving...')
-                wb.save()
+            # 14. 创建图表
+            self.create_charts(wb, sheetnames, timearr, wave, Ch, wn, rng_lcol, expInfo, Chpath, C)
 
-            try:
-                rng_lcol = len(yinterp[1]) + 2
-            except:
-                print("No temperature data")
-                rng_lcol = 2
-            if self.OGTTCheckBox.isChecked():
-                wb.sheets[sheetnames[7]].range(1, rng_lcol + 2).value = '血糖值' if C else 'Glucose Value'
-                wb.sheets[sheetnames[7]].range(2, rng_lcol + 1).value = timearr[0]
-                wb.sheets[sheetnames[7]].range(3, rng_lcol + 1).value = timearr[int(len(timearr) / 2)]
-                wb.sheets[sheetnames[7]].range(4, rng_lcol + 1).value = timearr[int(len(timearr) - 1)]
-                wb.sheets[sheetnames[7]].range(2, rng_lcol + 2).value = 5.5
-                wb.sheets[sheetnames[7]].range(3, rng_lcol + 2).value = 10.5
-                wb.sheets[sheetnames[7]].range(4, rng_lcol + 2).value = 5.5
-                gcols = xw.utils.col_name(rng_lcol + 1) + ':' + xw.utils.col_name(rng_lcol + 1)
-                wb.sheets[sheetnames[7]].api.Columns(gcols).NumberFormatLocal = "[$-x-systime]h:mm:ss AM/PM"
-
-            if self.PLTCheckBox.isChecked() == True:
-                for i in range(0, len(sheetnames)):
-                    wb.sheets[sheetnames[i]].api.Columns("A:A").NumberFormatLocal = "[$-x-systime]h:mm:ss AM/PM"
-                # 开始绘图
-                # 常量赋值
-                lft = 400  # 图表左距
-                tp = 400  # 图表上距
-                caw = 700  # 图表宽度
-                cah = 400  # 图表高度
-                ttftsz = 28  # 标题字体大小
-                axftsz = 18  # 轴字体大小
-                axttftsz = 18  # 轴标题字体大小
-                gsftsz = 18  # 图例字体大小
-                self.charts = []
-                # 绘图信息区，后面要修改就改这里
-                charttitles = ['12环差分信号vs.室温', '23环差分信号vs.测头旁皮肤温度',
-                               '1050nm单环吸光度', '1219nm单环吸光度',
-                               '34环差分信号vs.加热功率', '45环差分信号vs.测头下实际温度',
-                               '1314nm单环吸光度', '1409nm单环吸光度',
-                               '1050nm差分吸光度vs.测头下实际温度', '1550nm差分吸光度 - 1050nm差分吸光度',
-                               '1550nm单环吸光度', '1609nm单环吸光度',
-                               ]
-                ringsindex = ['Diff12', 'Diff23', '1050', '1219',
-                              'Diff34', 'Diff45', '1314', '1409',
-                              'Diff1050', 'Diff1550-Diff1050', '1550', '1609']
-                tempindex = ['4', '5', '0', '0',
-                             '15', '12', '0', '0',
-                             '12', '0', '0', '0']    # 对应sheet中的列，设置为0则不设置副坐标轴
-
-                infoindex = [False, False, False, False,
-                             True, True, True, True,
-                             False, False, False, False]
-
-                if self.OGTTCheckBox.isChecked() == True:  # OGTT时的血糖值绘制准备
-                    tempindex[5] = str(rng_lcol + 2)
-                    tempindex[10] = str(rng_lcol + 2)
-                    charttitles[5] = '45环差分信号vs.血糖真值'
-                    charttitles[10] = '1550nm单环吸光度vs.血糖真值'
-                # 提前算好X轴每格大小
-                # xmaxunit = int((timearr[int(len(timearr)-1)]-timearr[0])*24)/100
-
-                pltN = len(charttitles)
-                SRRange = 'A1:ZZ2'
-                diffSheet = wb.sheets[sheetnames[4]]
-                sglSheet = wb.sheets[sheetnames[1]]
-                tempSheet = wb.sheets[sheetnames[7]]
-
-                for p, each in enumerate(ringsindex):
-                    if each == '0':
-                        self.charts.append(None)
-                        continue
-
-                    # 数据源范围
-                    PltRangeS = 'A:A'
-
-                    if len(each) == 6:
-                        datasheet = diffSheet
-                        addr = self.FindRowColRange(datasheet, 'Col', each, SRRange)
-                        addrstr = xw.utils.col_name(int(addr) + 1) + ':' + xw.utils.col_name(int(addr) + wn)
-                        PltRangeS = PltRangeS + ', ' + addrstr
-                        ytitle = 'ΔAd'
-                    elif len(each) == 4:
-                        datasheet = sglSheet
-                        addr = self.FindRowColRange(datasheet, 'Col', each, SRRange)
-                        for i in range(0, Ch):
-                            addrstr = xw.utils.col_name(int(addr) + 7 * i) + ':' + xw.utils.col_name(int(addr) + 7 * i)
-                            PltRangeS = PltRangeS + ', ' + addrstr
-                            ytitle = 'ΔA'
-                    elif len(each) == 3:
-                        datasheet = sglSheet
-                        realeach = each.replace("-", "")
-                        addr = self.FindRowColRange(datasheet, 'Col', realeach, SRRange)
-                        addrstr = xw.utils.col_name(int(addr) + 1) + ':' + xw.utils.col_name(int(addr) + wn)
-                        PltRangeS = PltRangeS + ', ' + addrstr
-                        ytitle = '单环吸光度变化量'
-                    elif len(each) <= 2:
-                        datasheet = tempSheet
-                        addr = xw.utils.col_name(int(each))
-                        addrstr = addr + ':' + addr
-                        PltRangeS = PltRangeS + ', ' + addrstr
-                        ytitle = wb.sheets[sheetnames[7]].range(1, int(ringsindex[p])).value
-                    elif len(each) == 8:
-                        # example: diff1050
-                        datasheet = diffSheet
-                        waveIndex = wave.index(each[-4:]) + 1
-                        ytitle = 'ΔAd'
-                        for i in range(1, Ch):
-                            target = 'Diff' + str(i) + str(i + 1)
-                            addr = self.FindRowColRange(datasheet, 'Col', target, SRRange)
-                            addrstr = xw.utils.col_name(int(addr) + waveIndex) + ':' + xw.utils.col_name(int(addr) + waveIndex)
-                            PltRangeS = PltRangeS + ', ' + addrstr
-                    elif len(each) == 17:
-                        # example: diff1550-diff1550
-                        datasheet = diffSheet
-                        ytitle = 'ΔAd'
-                        wave1, wave2 = each[4:8], each[13:17]
-                        waveIndex1, waveIndex2 = wave.index(wave1) + 1, wave.index(wave2) + 1
-
-                        targets = ['Diff12', 'Diff23', 'Diff34', 'Diff45']
-                        sheet_target = wb.sheets[sheetnames[4]]
-
-                        # 动态获取最后一列索引，并计算新的列名
-                        last_col = sheet_target.used_range.last_cell.column
-                        indices = [xw.utils.col_name(last_col + 2 + i) for i in range(len(targets))]
-                        sheet_target.range(xw.utils.col_name(last_col + 1) + '1').value = wave1 + ' - ' + wave2
-
-                        # Get length of columns
-                        # for target, indice in zip(targets, indices):
-                        #     base_addr = int(self.FindRowColRange(datasheet, 'Col', target, SRRange))
-                        #     addr1, addr2 = base_addr + waveIndex1, base_addr + waveIndex2
-                        #
-                        #     addrstr1, addrstr2 = f"{xw.utils.col_name(addr1)}:{xw.utils.col_name(addr1)}", \
-                        #         f"{xw.utils.col_name(addr2)}:{xw.utils.col_name(addr2)}"
-                        #
-                        #     values1 = datasheet.range(addrstr1).options(np.array, ndim=2, empty=np.nan).value
-                        #     values2 = datasheet.range(addrstr2).options(np.array, ndim=2, empty=np.nan).value
-                        #     diff_values = values1 - values2
-                        #
-                        #     # 批量写入 Excel
-                        #     sheet_target.range(f"{indice}:{indice}").value = diff_values
-                        #     sheet_target.range(f"{indice}1").value = None
-                        #     sheet_target.range(f"{indice}2").value = target
-                        # 在 Excel 中插入计算公式
-                        for target, indice in zip(targets, indices):
-                            base_addr = int(self.FindRowColRange(datasheet, 'Col', target, SRRange))
-                            addr1, addr2 = xw.utils.col_name(base_addr + waveIndex1), xw.utils.col_name(
-                                base_addr + waveIndex2)
-
-                            # 绝对引用公式
-                            formula = f"=${addr1}2 - ${addr2}2"
-
-                            # 填充整个列（从 2 到最后一行）
-                            sheet_target.range(f"{indice}2:{indice}{datasheet.used_range.last_cell.row}").formula = formula
-
-                            # 设置表头信息
-                            sheet_target.range(f"{indice}1").value = None
-                            sheet_target.range(f"{indice}2").value = target
-
-                        PltRangeS += f", {indices[0]}1:{indices[-1]}{datasheet.used_range.last_cell.row}"
-                        self.charts.append(None)
-                        continue  # 仅处理数据但是不画图了
-
-                    pltrange = datasheet.range(PltRangeS)  # 此处要改*************************************此处已改
-
-                    # 副坐标轴数据范围
-                    if int(tempindex[p]) != 0:
-                        secaddr = xw.utils.col_name(int(tempindex[p]))
-                        secaddrstr = secaddr + ':' + secaddr
-                        SecRangeS = secaddrstr
-                        secrange = tempSheet.range(SecRangeS)
-
-                    self.GuiRefresh(self.Status, 'Plotting ' + str(p + 1) + '/' + str(pltN))
-
-                    """ 为了解决diff1050 和diff1550-diff1050绘图位置的问题 """
-                    # figure_cah = cah if len(each) < 8 else cah/2
-                    figure_lft = (lft + caw * int(p % 4)) if len(each) < 8 else lft + caw
-                    figure_top = (tp + cah * int(p / 4)) if len(each) <= 8 else (tp + cah * int(p / 4)) + cah/2
-                    self.charts.append(
-                        wb.sheets[sheetnames[4]].charts.add(left=figure_lft,
-                                                            top=figure_top,
-                                                            width=caw,
-                                                            height=cah))  # 此处要改*************************************此处已改
-
-                    # 设置图标类型，数据来源，图例位置
-                    self.charts[p].chart_type = 'xy_scatter_lines'  # 设置图标类型是xy散点连线图
-                    self.charts[p].set_source_data(pltrange)
-                    chartApi = self.charts[p].api[1]
-                    chartApi.Legend.Position = -4107
-
-                    # 添加副坐标轴
-                    series_count = chartApi.SeriesCollection().Count
-                    if int(tempindex[p]) > (rng_lcol):
-                        chartApi.SeriesCollection().Add(Source=secrange.api, SeriesLabels=True)
-                        series_count = chartApi.SeriesCollection().Count
-                        chartApi.FullSeriesCollection(series_count).Name = "=" + sheetnames[7] + "!" + xw.utils.col_name(rng_lcol + 2) + "1"
-                        chartApi.FullSeriesCollection(series_count).XValues = "=" + sheetnames[7] + "!" + xw.utils.col_name(rng_lcol + 1) + ":" + xw.utils.col_name(rng_lcol + 1)
-                        chartApi.FullSeriesCollection(series_count).Values = "=" + sheetnames[7] + "!" + xw.utils.col_name(rng_lcol + 2) + ":" + xw.utils.col_name(rng_lcol + 2)
-                        chartApi.SeriesCollection(series_count).AxisGroup = 2
-                        chartApi.Axes(2, 2).ReversePlotOrder = True
-                        chartApi.ChartColor = 10
-                        chartApi.FullSeriesCollection(series_count).Format.Line.ForeColor.RGB = 255
-                        chartApi.FullSeriesCollection(series_count).MarkerBackgroundColor = 255
-                        chartApi.FullSeriesCollection(series_count).MarkerForegroundColor = 255
-                    else:
-                        if int(tempindex[p]) != 0:
-                            chartApi.SeriesCollection().Add(Source=secrange.api, SeriesLabels=True)  # 此处要改*************************************此处已改
-                            chartApi.ChartColor = 10
-                            series_count = chartApi.SeriesCollection().Count
-                            chartApi.SeriesCollection(series_count).AxisGroup = 2
-
-                    # series_count = self.charts[p].api[1].SeriesCollection().Count
-                    # 修改chart系列标记，循环迭代每个系列
-                    for i in range(1, chartApi.SeriesCollection().Count + 1):
-                        series = chartApi.SeriesCollection(i)
-                        # 修改每个系列的标记类型和大小
-                        series.MarkerStyle = 8  # 标记类型为圆形
-                        series.MarkerSize = 5  # 标记大小为5
-
-                    # 图表整体样式
-                    chartApi.ChartArea.Format.Line.ForeColor.RGB = 14277081  # 在VBA立即窗口中输入 ?RGB(217, 217, 217) 回车可查看其数值
-                    # 三个坐标轴格式、颜色、线宽
-                    # 之前的颜色为14277081
-                    chartApi.Axes(1).MajorTickMark = xlwings.constants.Constants.xlCross
-                    chartApi.Axes(1).Format.Line.Weight = 1.5
-                    chartApi.Axes(1).Format.Line.ForeColor.RGB = 0
-                    chartApi.Axes(2, 1).MajorTickMark = xlwings.constants.Constants.xlInside
-                    chartApi.Axes(2, 1).Format.Line.Weight = 1.5
-                    chartApi.Axes(2, 1).Format.Line.ForeColor.RGB = 0
-                    chartApi.Axes(2, 1).MinorUnit = 0.001  if ytitle == 'ΔAd' else 0.01
-
-                    if int(tempindex[p]) != 0:
-                        chartApi.Axes(2, 2).MajorTickMark = xlwings.constants.Constants.xlInside
-                        chartApi.Axes(2, 2).Format.Line.Weight = 1.5
-                        chartApi.Axes(2, 2).Format.Line.ForeColor.RGB = 0
-                    # X轴刻度间隔和格式
-                    # self.charts[p].api[1].Axes(1).MajorUnit = xmaxunit
-                    chartApi.Axes(1).TickLabels.NumberFormatLocal = "h:mm;@"
-                    # 两个grid格式、颜色、线宽
-                    chartApi.SetElement(334)
-                    chartApi.SetElement(330)
-                    chartApi.Axes(1).MajorGridlines.Format.Line.ForeColor.RGB = 14277081
-                    chartApi.Axes(1).MajorGridlines.Format.Line.Weight = 0.75
-                    chartApi.Axes(2).MajorGridlines.Format.Line.ForeColor.RGB = 14277081
-                    chartApi.Axes(2).MajorGridlines.Format.Line.Weight = 0.75
-
-                    # 标题，字体及大小
-                    chartApi.SetElement(2)
-                    chartApi.ChartTitle.Format.TextFrame2.TextRange.Characters.Text = charttitles[p]  # 此处要改*************************************此处已改
-                    chartApi.ChartTitle.Format.TextFrame2.TextRange.Font.Name = "Calibri"
-                    chartApi.ChartTitle.Format.TextFrame2.TextRange.Characters.Font.Size = ttftsz  # 大小
-                    chartApi.ChartTitle.Format.TextFrame2.TextRange.Characters.Font.Bold = 1
-
-                    # y坐标轴标题, 字体及大小
-                    chartApi.Axes(2, 1).HasTitle = True
-                    chartApi.Axes(2, 1).AxisTitle.Characters.Text = ytitle  # 此处要改*************************************此处已改
-                    chartApi.Axes(2, 1).AxisTitle.Format.TextFrame2.TextRange.Font.Name = "Calibri"
-                    chartApi.Axes(2, 1).AxisTitle.Format.TextFrame2.TextRange.Font.Size = axttftsz
-                    chartApi.Axes(2, 1).AxisTitle.Format.TextFrame2.TextRange.Font.Bold = 1
-
-                    if int(tempindex[p]) != 0:
-                        # y2坐标轴标题, 字体及大小
-                        chartApi.Axes(2, 2).HasTitle = True
-                        chartApi.Axes(2, 2).AxisTitle.Characters.Text = wb.sheets[sheetnames[7]].range(1, int(tempindex[p])).value  # 此处要改*************************************此处已改
-                        chartApi.Axes(2, 2).AxisTitle.Format.TextFrame2.TextRange.Font.Name = "Calibri"
-                        chartApi.Axes(2, 2).AxisTitle.Format.TextFrame2.TextRange.Font.Size = axttftsz
-                        chartApi.Axes(2, 2).AxisTitle.Format.TextFrame2.TextRange.Font.Bold = 1
-
-                    # 三个坐标轴字体大小 设置坐标轴字体加粗
-                    chartApi.Axes(1).TickLabels.Font.Size = axftsz
-                    chartApi.Axes(1).TickLabels.Font.Bold = 1
-                    chartApi.Axes(2, 1).TickLabels.Font.Size = axftsz
-                    chartApi.Axes(2, 1).TickLabels.Font.Bold = 1
-                    if int(tempindex[p]) != 0:
-                        chartApi.Axes(2, 2).TickLabels.Font.Size = axftsz
-                        chartApi.Axes(2, 2).TickLabels.Font.Bold = 1
-
-                    # 图例
-                    chartApi.Legend.Format.TextFrame2.TextRange.Font.Size = gsftsz - 1
-                    chartApi.Legend.Format.TextFrame2.TextRange.Font.Bold = 1
-
-                    # 添加标志中的内容
-                    series_count = chartApi.SeriesCollection().Count
-                    series_count += 0 if int(tempindex[p]) != 0 else 1
-
-                    if 'expInfo' in locals().keys() and (self.expInfoCheckBox.isChecked() or infoindex[p]):
-                        for nitem, item in enumerate(expInfo['schedule']):
-                            t = item['time'] + np.floor(timearr[0])
-                            # 添加新的数据序列
-                            y_min = chartApi.Axes(2, 1).MinimumScale
-                            y_max = chartApi.Axes(2, 1).MaximumScale
-                            series = chartApi.SeriesCollection().NewSeries()
-                            itemColor = self.hexColor2Int(self.colors[nitem % len(self.colors)])
-                            if len(t) == 2:
-                                # 画一个框
-                                pointIdx = 3    # 读取框框右上角的点
-                                # itemColor = 255
-
-                                series.XValues = [t[0], t[0], t[1], t[1], t[0]]  # 明确转换为数组
-                                series.Values = [y_min, y_max, y_max, y_min, y_min]
-                            elif len(t) == 1:
-                                # 画一条线
-                                pointIdx = 2    # 读取上面的点
-                                # itemColor = 16711680
-
-                                series.XValues = [t[0], t[0]]  # 明确转换为数组
-                                series.Values = [y_min, y_max]
-                            else:
-                                # 未知类型，不处理
-                                raise ValueError(f'Error time length {len(t)} for {item["activity"]}')
-                            chartApi.Axes(2, 1).MinimumScale = y_min
-                            chartApi.Axes(2, 1).MaximumScale = y_max
-
-                            # 设置序列的格式 (直线，颜色，粗细等)
-                            series.ChartType = 75
-                            series.Format.Line.Weight = 2.5  # 线宽度
-                            series.Format.Line.DashStyle = 4    # 绘制虚线
-                            series.Format.Line.ForeColor.RGB = itemColor
-
-                            series.Points(pointIdx).ApplyDataLabels()
-                            series.Points(pointIdx).DataLabel.Text = item["activity"]
-                            # series.Points(pointIdx).DataLabel.Font.Size = axftsz + 2
-                            series.Points(pointIdx).DataLabel.Font.Size = 28
-                            series.Points(pointIdx).DataLabel.Font.Bold = 1
-                            series.Points(pointIdx).DataLabel.Format.TextFrame2.TextRange.Font.Fill.ForeColor.RGB = itemColor
-                            leg = chartApi.Legend.LegendEntries(series_count)
-                            leg.Delete()
-
-                    # 运行时间和过程记录
-                    self.currenttime = datetime.datetime.now()
-                    self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
-
-                if 'expInfo' in locals().keys():
-                    self.GuiRefresh(self.Status, 'Adding remarks')
-                    textbox = wb.sheets[sheetnames[4]].shapes.api.AddTextbox(
-                        Orientation=1,  # 文本框方向（1=水平）
-                        Left=lft,  # 左边距
-                        Top=tp + cah*2,    # 顶边距
-                        Width=caw/2,       # 宽度
-                        Height=cah,       # 高度
-                    )
-                    # 设置文本和格式
-                    textbox.TextFrame2.TextRange.Characters.Text = "备注:\n" + expInfo['remark'] if expInfo['remark'] is not None else "备注:\n"
-                    textbox.TextFrame2.TextRange.ParagraphFormat.Alignment = 2  # 居中
-                    textbox.TextFrame2.TextRange.Characters.Font.Name = "Times New Roman"
-                    textbox.TextFrame2.TextRange.Characters.Font.Size = 40
-                    textbox.TextFrame2.TextRange.Characters.Font.Bold = 1
-
-                # 添加标题
-                titlebox = wb.sheets[sheetnames[4]].shapes.api.AddTextbox(
-                    Orientation=1,  # 文本框方向（1=水平）
-                    Left=lft,  # 左边距
-                    Top=tp - 100,  # 顶边距
-                    Width=caw*3,  # 宽度
-                    Height=100,  # 高度
-                )
-                titlebox.Fill.ForeColor.RGB = xw.utils.rgb_to_int((255, 255, 0))
-                titlebox.TextFrame2.TextRange.Characters.Text = Chpath.split('\\')[-2]
-                titlebox.TextFrame2.VerticalAnchor = 3  # 居中
-                titlebox.TextFrame2.TextRange.Characters.Font.Name = "Times New Roman"
-                titlebox.TextFrame2.TextRange.Characters.Font.Size = 54
-                titlebox.TextFrame2.TextRange.Characters.Font.Bold = 1
-
-                self.GuiRefresh(self.Status, 'Saving...')
-                wb.save()
-
-            # 最后，保存关闭并输出情况
+            # 15. 最终保存和清理
             wb.close()
             self.GuiRefresh(self.Status, 'Process Finished')
             self.Process.setEnabled(True)
             self.currenttime = datetime.datetime.now()
             self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
-        # 错误情况放在error text里，方便排查
+
+        # 错误处理
         except Exception as ex:
             self.GuiRefresh(self.ErrorText, str(ex))
             self.Process.setEnabled(True)
@@ -869,32 +943,440 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
             except Exception as e:
                 pass
 
-    # """对QDialog类重写，实现一些功能"""
-    # """重写closeEvent方法，实现dialog窗体关闭时执行一些代码
+    def _create_individual_charts(self, wb, sheetnames, charttitles, ringsindex, tempindex, infoindex,
+                                  wave, Ch, wn, timearr, expInfo, Chpath, C, rng_lcol, pltN, SRRange,
+                                  diffSheet, sglSheet, tempSheet):
+        """
+        创建具体的图表实现
+
+        Args:
+            wb: Excel工作簿对象
+            sheetnames: 工作表名称列表
+            charttitles: 图表标题列表
+            ringsindex: 环标识列表
+            tempindex: 温度数据索引列表
+            infoindex: 信息索引列表
+            wave: 波长列表
+            Ch: 环数
+            wn: 波长数量
+            timearr: 时间数组
+            expInfo: 实验信息
+            Chpath: 数据文件路径
+            C: 是否为中文文件名
+            rng_lcol: 血糖数据列索引
+            pltN: 图表数量
+            SRRange: 搜索范围
+            diffSheet, sglSheet, tempSheet: 各工作表对象
+        """
+        for p, each in enumerate(ringsindex):
+            if each == '0':
+                self.charts.append(None)
+                continue
+
+            # 确定数据源范围
+            PltRangeS = 'A:A'  # 时间列
+
+            if len(each) == 6:  # 差分数据，如'Diff12'
+                datasheet = diffSheet
+                addr = self.FindRowColRange(datasheet, 'Col', each, SRRange)
+                addrstr = xw.utils.col_name(int(addr) + 1) + ':' + xw.utils.col_name(int(addr) + wn)
+                PltRangeS = PltRangeS + ', ' + addrstr
+                ytitle = 'ΔAd'
+
+            elif len(each) == 4:  # 单环数据，如'1050'
+                datasheet = sglSheet
+                addr = self.FindRowColRange(datasheet, 'Col', each, SRRange)
+                for i in range(0, Ch):
+                    addrstr = xw.utils.col_name(int(addr) + 7 * i) + ':' + xw.utils.col_name(int(addr) + 7 * i)
+                    PltRangeS = PltRangeS + ', ' + addrstr
+                ytitle = 'ΔA'
+
+            elif len(each) == 8:  # 特定波长的差分数据，如'Diff1050'
+                datasheet = diffSheet
+                waveIndex = wave.index(each[-4:]) + 1
+                ytitle = 'ΔAd'
+                for i in range(1, Ch):
+                    target = 'Diff' + str(i) + str(i + 1)
+                    addr = self.FindRowColRange(datasheet, 'Col', target, SRRange)
+                    addrstr = xw.utils.col_name(int(addr) + waveIndex) + ':' + xw.utils.col_name(int(addr) + waveIndex)
+                    PltRangeS = PltRangeS + ', ' + addrstr
+
+            elif len(each) == 17:  # 差分计算，如'Diff1550-Diff1050'
+                datasheet = diffSheet
+                ytitle = 'ΔAd'
+                wave1, wave2 = each[4:8], each[13:17]
+                waveIndex1, waveIndex2 = wave.index(wave1) + 1, wave.index(wave2) + 1
+
+                targets = ['Diff12', 'Diff23', 'Diff34', 'Diff45']
+                sheet_target = wb.sheets[sheetnames[4]]
+
+                # 动态获取最后一列索引，并计算新的列名
+                last_col = sheet_target.used_range.last_cell.column
+                indices = [xw.utils.col_name(last_col + 2 + i) for i in range(len(targets))]
+                sheet_target.range(xw.utils.col_name(last_col + 1) + '1').value = wave1 + ' - ' + wave2
+
+                # 在 Excel 中插入计算公式
+                for target, indice in zip(targets, indices):
+                    base_addr = int(self.FindRowColRange(datasheet, 'Col', target, SRRange))
+                    addr1, addr2 = xw.utils.col_name(base_addr + waveIndex1), xw.utils.col_name(
+                        base_addr + waveIndex2)
+
+                    # 绝对引用公式
+                    formula = f"=${addr1}2 - ${addr2}2"
+
+                    # 填充整个列（从 2 到最后一行）
+                    sheet_target.range(f"{indice}2:{indice}{datasheet.used_range.last_cell.row}").formula = formula
+
+                    # 设置表头信息
+                    sheet_target.range(f"{indice}1").value = None
+                    sheet_target.range(f"{indice}2").value = target
+
+                PltRangeS += f", {indices[0]}1:{indices[-1]}{datasheet.used_range.last_cell.row}"
+                if not self.waveDiffCheckBox.isChecked():
+                    self.charts.append(None)
+                    continue  # 仅处理数据但是不画图了
+
+            elif len(each) <= 2:  # 温度数据
+                datasheet = tempSheet
+                addr = xw.utils.col_name(int(each))
+                addrstr = addr + ':' + addr
+                PltRangeS = PltRangeS + ', ' + addrstr
+                ytitle = wb.sheets[sheetnames[7]].range(1, int(each)).value
+
+            # 获取数据范围
+            pltrange = datasheet.range(PltRangeS)
+
+            # 设置副坐标轴数据范围
+            secrange = None
+            if int(tempindex[p]) != 0:
+                if int(tempindex[p]) > rng_lcol:  # 血糖数据
+                    secaddr = xw.utils.col_name(int(tempindex[p]))
+                    secaddrstr = secaddr + ':' + secaddr
+                    SecRangeS = secaddrstr
+                    secrange = tempSheet.range(SecRangeS)
+                else:  # 温度数据
+                    secaddr = xw.utils.col_name(int(tempindex[p]))
+                    secaddrstr = secaddr + ':' + secaddr
+                    SecRangeS = secaddrstr
+                    secrange = tempSheet.range(SecRangeS)
+
+            self.GuiRefresh(self.Status, 'Plotting ' + str(p + 1) + '/' + str(pltN))
+
+            # 计算图表位置 - 为了解决diff1050和diff1550-diff1050绘图位置的问题
+            # if len(each) <= 8:
+            #     figure_lft = self.CHART_LEFT + self.CHART_WIDTH * int(p % 4)
+            #     figure_top = self.CHART_TOP + self.CHART_HEIGHT * int(p / 4)
+            #     figure_height = self.CHART_HEIGHT
+            # else:
+            #     # len(each) >= 8的情况，图表位置需要特殊处理
+            #     figure_lft = self.CHART_LEFT + self.CHART_WIDTH * int(p % 4)
+            #     figure_top = self.CHART_TOP + self.CHART_HEIGHT * int(p / 4)
+            #     figure_height = self.CHART_HEIGHT
+
+            figure_lft = (self.CHART_LEFT + self.CHART_WIDTH * int(p % 4)) if len(each) < 8 else self.CHART_LEFT + self.CHART_WIDTH
+            figure_top = (self.CHART_TOP + self.CHART_HEIGHT * int(p / 4)) if len(each) <= 8 else (self.CHART_TOP + self.CHART_HEIGHT * int(p / 4)) + self.CHART_HEIGHT / 2
+
+            if self.waveDiffCheckBox.isChecked() and len(each) == 17:
+                # 放到1219单环的位置上
+                figure_lft = self.CHART_LEFT + self.CHART_WIDTH * 3
+                figure_top = self.CHART_TOP
+
+            # 创建图表
+            chart = wb.sheets[sheetnames[4]].charts.add(
+                left=figure_lft,
+                top=figure_top,
+                width=self.CHART_WIDTH,
+                height=self.CHART_HEIGHT,
+            )
+            self.charts.append(chart)
+
+            # 设置图表基本属性
+            chart.chart_type = 'xy_scatter_lines'
+            chart.set_source_data(pltrange)
+            chartApi = chart.api[1]
+            chartApi.Legend.Position = -4107  # xlLegendPositionBottom
+
+            # 设置X轴范围
+            ratio = 0.05
+            chartApi.Axes(1).MinimumScale = timearr.min() - ratio * (timearr.max() - timearr.min())
+            chartApi.Axes(1).MaximumScale = timearr.max() + ratio * (timearr.max() - timearr.min())
+
+            # 添加副坐标轴数据
+            series_count = chartApi.SeriesCollection().Count
+            if secrange is not None:
+                if int(tempindex[p]) > rng_lcol:  # 血糖数据特殊处理
+                    chartApi.SeriesCollection().Add(Source=secrange.api, SeriesLabels=True)
+                    series_count = chartApi.SeriesCollection().Count
+                    chartApi.FullSeriesCollection(series_count).Name = "=" + sheetnames[7] + "!" + xw.utils.col_name(rng_lcol + 2) + "1"
+                    chartApi.FullSeriesCollection(series_count).XValues = "=" + sheetnames[7] + "!" + xw.utils.col_name(rng_lcol + 1) + ":" + xw.utils.col_name(rng_lcol + 1)
+                    chartApi.FullSeriesCollection(series_count).Values = "=" + sheetnames[7] + "!" + xw.utils.col_name(rng_lcol + 2) + ":" + xw.utils.col_name(rng_lcol + 2)
+                    chartApi.SeriesCollection(series_count).AxisGroup = 2
+                    chartApi.Axes(2, 2).ReversePlotOrder = True
+                    chartApi.ChartColor = 10
+                    chartApi.FullSeriesCollection(series_count).Format.Line.ForeColor.RGB = 255
+                    chartApi.FullSeriesCollection(series_count).MarkerBackgroundColor = 255
+                    chartApi.FullSeriesCollection(series_count).MarkerForegroundColor = 255
+                else:  # 普通温度数据
+                    chartApi.SeriesCollection().Add(Source=secrange.api, SeriesLabels=True)
+                    chartApi.ChartColor = 10
+                    series_count = chartApi.SeriesCollection().Count
+                    chartApi.SeriesCollection(series_count).AxisGroup = 2
+
+            # 设置系列标记样式
+            for i in range(1, chartApi.SeriesCollection().Count + 1):
+                series = chartApi.SeriesCollection(i)
+                series.MarkerStyle = 8  # 圆形标记
+                series.MarkerSize = 5
+
+            self._configure_chart_appearance(chartApi, charttitles[p], ytitle, tempindex[p],
+                                           wb, sheetnames, rng_lcol)
+
+            # 添加实验信息标注
+            if expInfo and (self.expInfoCheckBox.isChecked() or infoindex[p]):
+                self._add_experiment_annotations(chartApi, expInfo, timearr, p)
+
+            self.currenttime = datetime.datetime.now()
+            self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
+
+        # 添加备注和标题
+        self._add_chart_annotations(wb, sheetnames, expInfo, Chpath)
+
+        self.GuiRefresh(self.Status, 'Saving...')
+        wb.save()
+
+    def _configure_chart_appearance(self, chartApi, chart_title, ytitle, temp_index,
+                                   wb, sheetnames, rng_lcol):
+        """
+        配置图表外观样式
+
+        Args:
+            chartApi: 图表API对象
+            chart_title: 图表标题
+            ytitle: Y轴标题
+            temp_index: 温度数据索引
+            wb: Excel工作簿对象
+            sheetnames: 工作表名称列表
+            rng_lcol: 血糖数据列索引
+        """
+        # 图表整体样式
+        chartApi.ChartArea.Format.Line.ForeColor.RGB = self.CHART_BORDER_COLOR
+
+        # 坐标轴格式
+        chartApi.Axes(1).MajorTickMark = xw.constants.Constants.xlCross
+        chartApi.Axes(1).Format.Line.Weight = self.AXIS_WEIGHT
+        chartApi.Axes(1).Format.Line.ForeColor.RGB = 0
+        chartApi.Axes(2, 1).MajorTickMark = xw.constants.Constants.xlInside
+        chartApi.Axes(2, 1).Format.Line.Weight = self.AXIS_WEIGHT
+        chartApi.Axes(2, 1).Format.Line.ForeColor.RGB = 0
+        chartApi.Axes(2, 1).MinorUnit = 0.001 if ytitle == 'ΔAd' else 0.01
+
+        if int(temp_index) != 0:
+            chartApi.Axes(2, 2).MajorTickMark = xw.constants.Constants.xlInside
+            chartApi.Axes(2, 2).Format.Line.Weight = self.AXIS_WEIGHT
+            chartApi.Axes(2, 2).Format.Line.ForeColor.RGB = 0
+
+        # X轴格式
+        chartApi.Axes(1).TickLabels.NumberFormatLocal = "h:mm;@"
+
+        # 网格线
+        chartApi.SetElement(334)  # 主要网格线
+        chartApi.SetElement(330)  # 次要网格线
+        chartApi.Axes(1).MajorGridlines.Format.Line.ForeColor.RGB = self.GRID_COLOR
+        chartApi.Axes(1).MajorGridlines.Format.Line.Weight = self.GRID_WEIGHT
+        chartApi.Axes(2).MajorGridlines.Format.Line.ForeColor.RGB = self.GRID_COLOR
+        chartApi.Axes(2).MajorGridlines.Format.Line.Weight = self.GRID_WEIGHT
+
+        # 图表标题
+        chartApi.SetElement(2)
+        chartApi.ChartTitle.Format.TextFrame2.TextRange.Characters.Text = chart_title
+        chartApi.ChartTitle.Format.TextFrame2.TextRange.Font.Name = "Calibri"
+        chartApi.ChartTitle.Format.TextFrame2.TextRange.Characters.Font.Size = self.TITLE_FONT_SIZE
+        chartApi.ChartTitle.Format.TextFrame2.TextRange.Characters.Font.Bold = 1
+
+        # Y轴标题
+        chartApi.Axes(2, 1).HasTitle = True
+        chartApi.Axes(2, 1).AxisTitle.Characters.Text = ytitle
+        chartApi.Axes(2, 1).AxisTitle.Format.TextFrame2.TextRange.Font.Name = "Calibri"
+        chartApi.Axes(2, 1).AxisTitle.Format.TextFrame2.TextRange.Font.Size = self.AXIS_TITLE_FONT_SIZE
+        chartApi.Axes(2, 1).AxisTitle.Format.TextFrame2.TextRange.Font.Bold = 1
+
+        if int(temp_index) != 0:
+            # Y2轴标题
+            chartApi.Axes(2, 2).HasTitle = True
+            chartApi.Axes(2, 2).AxisTitle.Characters.Text = wb.sheets[sheetnames[7]].range(1, int(temp_index)).value
+            chartApi.Axes(2, 2).AxisTitle.Format.TextFrame2.TextRange.Font.Name = "Calibri"
+            chartApi.Axes(2, 2).AxisTitle.Format.TextFrame2.TextRange.Font.Size = self.AXIS_TITLE_FONT_SIZE
+            chartApi.Axes(2, 2).AxisTitle.Format.TextFrame2.TextRange.Font.Bold = 1
+
+        # 坐标轴字体
+        chartApi.Axes(1).TickLabels.Font.Size = self.AXIS_FONT_SIZE
+        chartApi.Axes(1).TickLabels.Font.Bold = 1
+        chartApi.Axes(2, 1).TickLabels.Font.Size = self.AXIS_FONT_SIZE
+        chartApi.Axes(2, 1).TickLabels.Font.Bold = 1
+        if int(temp_index) != 0:
+            chartApi.Axes(2, 2).TickLabels.Font.Size = self.AXIS_FONT_SIZE
+            chartApi.Axes(2, 2).TickLabels.Font.Bold = 1
+
+        # 图例
+        chartApi.Legend.Format.TextFrame2.TextRange.Font.Size = self.LEGEND_FONT_SIZE - 1
+        chartApi.Legend.Format.TextFrame2.TextRange.Font.Bold = 1
+
+    def _add_experiment_annotations(self, chartApi, expInfo, timearr, chart_index):
+        """
+        添加实验信息标注到图表
+
+        Args:
+            chartApi: 图表API对象
+            expInfo: 实验信息字典
+            timearr: 时间数组
+            chart_index: 图表索引
+        """
+        # 获取当前系列数量，用于后续图例删除
+        initial_series_count = chartApi.SeriesCollection().Count
+
+        for nitem, item in enumerate(expInfo['schedule']):
+            # 处理时间数据
+            time_data = item.get('time')
+            if time_data is None:
+                continue
+
+            # 确保时间数据是可迭代的
+            if isinstance(time_data, (int, float)):
+                t = [time_data + np.floor(timearr[0])]
+            elif isinstance(time_data, (list, tuple)) and len(time_data) == 2:
+                t = [time_data[0] + np.floor(timearr[0]), time_data[1] + np.floor(timearr[0])]
+            else:
+                continue
+
+            # 添加新的数据序列
+            y_min = chartApi.Axes(2, 1).MinimumScale
+            y_max = chartApi.Axes(2, 1).MaximumScale
+            series = chartApi.SeriesCollection().NewSeries()
+            itemColor = self.hexColor2Int(self.CHART_COLORS[nitem % len(self.CHART_COLORS)])
+
+            if len(t) == 2:  # 时间段 - 画框
+                pointIdx = 3 if nitem % 2 == 0 else 6
+                t_point = t[0] + (t[1] - t[0]) / 2
+
+                series.XValues = [t[0], t[0], t_point, t[1], t[1], t_point, t[0]]
+                series.Values = [y_min, y_max, y_max, y_max, y_min, y_min, y_min]
+
+            elif len(t) == 1:  # 时间点 - 画线
+                pointIdx = 2 if nitem % 2 == 0 else 1
+
+                series.XValues = [t[0], t[0]]
+                series.Values = [y_min, y_max]
+            else:
+                # 未知类型，跳过
+                continue
+
+            chartApi.Axes(2, 1).MinimumScale = y_min
+            chartApi.Axes(2, 1).MaximumScale = y_max
+
+            # 设置序列格式
+            series.ChartType = 75  # xlLine
+            series.Format.Line.Weight = self.ANNOTATION_LINE_WEIGHT
+            series.Format.Line.DashStyle = 4  # 虚线
+            series.Format.Line.ForeColor.RGB = itemColor
+
+            # 在特定图表上添加标签
+            if chart_index == 5:  # 第6个图表
+                try:
+                    series.Points(pointIdx).ApplyDataLabels()
+                    series.Points(pointIdx).DataLabel.Text = item["activity"]
+                    series.Points(pointIdx).DataLabel.Font.Size = self.LABEL_FONT_SIZE
+                    series.Points(pointIdx).DataLabel.Font.Bold = 1
+                    series.Points(pointIdx).DataLabel.Format.TextFrame2.TextRange.Font.Fill.ForeColor.RGB = itemColor
+                except:
+                    # 如果标签添加失败，继续处理其他部分
+                    pass
+
+            # 隐藏图例 - 删除标注线的图例项
+            try:
+                current_series_count = chartApi.SeriesCollection().Count
+                leg = chartApi.Legend.LegendEntries(initial_series_count)
+                leg.Delete()
+            except:
+                # 如果图例删除失败，继续处理
+                print('warning, 删除图例失败')
+                pass
+
+    def _add_chart_annotations(self, wb, sheetnames, expInfo, Chpath):
+        """
+        添加图表标注和备注
+
+        Args:
+            wb: Excel工作簿对象
+            sheetnames: 工作表名称列表
+            expInfo: 实验信息
+            Chpath: 数据文件路径
+        """
+        # 添加备注文本框
+        if expInfo:
+            self.GuiRefresh(self.Status, 'Adding remarks')
+            textbox = wb.sheets[sheetnames[4]].shapes.api.AddTextbox(
+                Orientation=1,  # 水平方向
+                Left=self.CHART_LEFT,
+                Top=self.CHART_TOP + self.CHART_HEIGHT * 2,
+                Width=self.CHART_WIDTH / 2,
+                Height=self.CHART_HEIGHT,
+            )
+            # 显示备注内容，如果没有备注则显示默认文本
+            remark_text = "备注:\n" + (expInfo.get('remark', '') if expInfo.get('remark') else "")
+            textbox.TextFrame2.TextRange.Characters.Text = remark_text
+            textbox.TextFrame2.TextRange.ParagraphFormat.Alignment = 2  # 居中
+            textbox.TextFrame2.TextRange.Characters.Font.Name = "Times New Roman"
+            textbox.TextFrame2.TextRange.Characters.Font.Size = self.ANNOTATION_FONT_SIZE
+            textbox.TextFrame2.TextRange.Characters.Font.Bold = 1
+
+        # 添加标题文本框
+        titlebox = wb.sheets[sheetnames[4]].shapes.api.AddTextbox(
+            Orientation=1,
+            Left=self.CHART_LEFT,
+            Top=self.CHART_TOP - 100,
+            Width=self.CHART_WIDTH * 3,
+            Height=100,
+        )
+        titlebox.Fill.ForeColor.RGB = xw.utils.rgb_to_int(self.TITLE_BOX_COLOR)
+        titlebox.TextFrame2.TextRange.Characters.Text = Chpath.split('\\')[-2]
+        titlebox.TextFrame2.VerticalAnchor = 3  # 垂直居中
+        titlebox.TextFrame2.TextRange.Characters.Font.Name = "Times New Roman"
+        titlebox.TextFrame2.TextRange.Characters.Font.Size = self.MAIN_TITLE_FONT_SIZE
+        titlebox.TextFrame2.TextRange.Characters.Font.Bold = 1
+
+    # ==================== 窗口事件处理 ====================
+
     def closeEvent(self, event):
-        # :param event: close()触发的事件
-        # :return: None
-        # """
+        """
+        重写窗口关闭事件
+
+        Args:
+            event: 关闭事件对象
+        """
         reply = QtWidgets.QMessageBox.question(self,
                                                'Exit',
                                                "Confirm Exit?",
                                                QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
                                                QtWidgets.QMessageBox.StandardButton.No)
         if reply == QtWidgets.QMessageBox.StandardButton.Yes:
-            #         self.stoptime=datetime.datetime.now()
             event.accept()
         else:
             event.ignore()
 
 
 if __name__ == "__main__":
-    # QCoreApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+    """
+    程序入口点
+
+    创建QApplication实例，显示主窗口，并启动事件循环
+    """
     app = QApplication(sys.argv)
     form = GUI_Dialog()
     form.show()
 
     app.exec()
 
+    # 清理Excel应用程序
     form.xwapp.quit()
     try:
         form.xwapp.kill()
