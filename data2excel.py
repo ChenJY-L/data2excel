@@ -37,7 +37,7 @@ import ctypes
 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("myappid")
 
 
-class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
+class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
     """
     数据处理主界面类
 
@@ -91,6 +91,7 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
 
         # 设置默认选项
         # self.DyBCCheckBox.setChecked(True)
+        self.waveDiffCheckBox.setChecked(True)
 
         # 连接信号和槽函数
         self.Process.clicked.connect(self.DataProcess)
@@ -740,7 +741,7 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
             int: 血糖数据列的索引
         """
         try:
-            rng_lcol = len(yinterp[1]) + 2
+            rng_lcol = len(yinterp[1]) + 3
         except:
             print("No temperature data")
             rng_lcol = 2
@@ -759,6 +760,48 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
         wb.sheets[sheetnames[7]].api.Columns(gcols).NumberFormatLocal = "[$-x-systime]h:mm:ss AM/PM"
 
         return rng_lcol
+
+    def add_info_data(self, wb, sheetnames, expInfo, timearr):
+        """
+        添加实验信息到Excel
+
+        Args:
+            wb: Excel工作簿对象
+            sheetnames: 工作表名称列表
+            expInfo: 实验信息
+            timearr: 时间数组
+        """
+        if expInfo is None:
+            return
+
+        # 定义正则表达式，检测activity是否为纯数字
+        pattern = r'^-?\d+(\.\d+)?$'
+
+        max_col = wb.sheets[sheetnames[7]].used_range.last_cell.column
+        wb.sheets[sheetnames[7]].range(1, max_col + 1).value = '相对高度(cm)'
+
+        relative_height = np.full((timearr.shape[0], 1), np.nan)
+        for nitem, item in enumerate(expInfo['schedule']):
+            time_data = item.get('time')
+            activity = item.get('activity')
+            height = float(activity) if re.fullmatch(pattern, activity) else np.nan
+
+            if time_data is None:
+                continue
+
+            # 确保时间数据是可迭代的
+            if isinstance(time_data, (int, float)):
+                # 跳过时间点
+                continue
+            elif isinstance(time_data, (list, tuple)) and len(time_data) == 2:
+                t = [time_data[0] + np.floor(timearr[0]), time_data[1] + np.floor(timearr[0])]
+            else:
+                continue
+
+            relative_height[np.logical_and(timearr >= t[0], timearr < t[1])] = height
+
+        # relative_height = np.where(np.isnan(relative_height), None, relative_height)
+        wb.sheets[sheetnames[7]].range(2, max_col + 1).value = relative_height
 
     def create_charts(self, wb, sheetnames, timearr, wave, Ch, wn, rng_lcol, expInfo, Chpath, C):
         """
@@ -789,7 +832,7 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
         # 图表配置信息
         charttitles = ['12环差分信号vs.室温', '23环差分信号vs.测头旁皮肤温度',
                        '1050nm单环吸光度', '1219nm单环吸光度',
-                       '34环差分信号vs.加热功率', '45环差分信号vs.测头下实际温度',
+                       '34环差分信号vs.加热功率', '45环差分信号vs.测头相对扶手高度(cm)',
                        '1314nm单环吸光度', '1409nm单环吸光度',
                        '1050nm差分吸光度vs.测头下实际温度', '1550nm差分吸光度 - 1050nm差分吸光度',
                        '1550nm单环吸光度', '1609nm单环吸光度']
@@ -799,7 +842,7 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
                       'Diff1050', 'Diff1550-Diff1050', '1550', '1609']
 
         tempindex = ['4', '5', '0', '0',
-                     '15', '12', '0', '0',
+                     '15', '31', '0', '0',
                      '12', '0', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
 
         infoindex = [False, False, False, False,
@@ -921,13 +964,16 @@ class GUI_Dialog(QDialog, QTUI.Ui_Data_Processing):
             # 12. 处理动态基准周期
             self.handle_dynamic_base_cycle(wb, sheetnames, Ch, n, wn, C)
 
-            # 13. 添加血糖数据
+            # 13. 添加备注数据
+            self.add_info_data(wb, sheetnames, expInfo, timearr)
+
+            # 14. 添加血糖数据
             rng_lcol = self.add_glucose_data(wb, sheetnames, timearr, yinterp, C)
 
-            # 14. 创建图表
+            # 15. 创建图表
             self.create_charts(wb, sheetnames, timearr, wave, Ch, wn, rng_lcol, expInfo, Chpath, C)
 
-            # 15. 最终保存和清理
+            # 16. 最终保存和清理
             wb.close()
             self.GuiRefresh(self.Status, 'Process Finished')
             self.Process.setEnabled(True)
@@ -1372,6 +1418,7 @@ if __name__ == "__main__":
     """
     app = QApplication(sys.argv)
     form = GUI_Dialog()
+    app.processEvents()
     form.show()
 
     app.exec()
