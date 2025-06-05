@@ -189,11 +189,11 @@ class Ui_Data_Processing(object):
         Data_Processing.setWindowTitle(_translate("Data_Processing", "Data Processing Tool"))
 
         # GroupBox 标题
-        self.dataInputGroup.setTitle(_translate("Data_Processing", "数据输入 / Data Input"))
-        self.optionsGroup.setTitle(_translate("Data_Processing", "处理选项 / Processing Options"))
-        self.parametersGroup.setTitle(_translate("Data_Processing", "参数设置 / Parameters"))
-        self.controlGroup.setTitle(_translate("Data_Processing", "控制 / Control"))
-        self.infoGroup.setTitle(_translate("Data_Processing", "信息显示 / Information"))
+        self.dataInputGroup.setTitle(_translate("Data_Processing", "Data Input"))
+        self.optionsGroup.setTitle(_translate("Data_Processing", "Processing Options"))
+        self.parametersGroup.setTitle(_translate("Data_Processing", "Parameters"))
+        self.controlGroup.setTitle(_translate("Data_Processing", "Control"))
+        self.infoGroup.setTitle(_translate("Data_Processing", "Information"))
 
         # 控件文本
         self.Original.setItemText(0, _translate("Data_Processing", "Calibrated"))
