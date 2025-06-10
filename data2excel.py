@@ -92,6 +92,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         # 设置默认选项
         # self.DyBCCheckBox.setChecked(True)
         self.waveDiffCheckBox.setChecked(True)
+        self.expInfoCheckBox.setChecked(True)
 
         # 连接信号和槽函数
         self.Process.clicked.connect(self.DataProcess)
@@ -786,7 +787,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             activity = item.get('activity')
             height = float(activity) if re.fullmatch(pattern, activity) else np.nan
 
-            if time_data is None:
+            if time_data is None or np.isnan(height):
                 continue
 
             # 确保时间数据是可迭代的
@@ -1179,7 +1180,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
             # 添加实验信息标注
             if expInfo and (self.expInfoCheckBox.isChecked() or infoindex[p]):
-                self._add_experiment_annotations(chartApi, expInfo, timearr, p)
+                with_subaxis = False if int(tempindex[p]) == 0 else True
+                self._add_experiment_annotations(chartApi, expInfo, timearr, p, with_subaxis)
 
             self.currenttime = datetime.datetime.now()
             self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
@@ -1267,7 +1269,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         chartApi.Legend.Format.TextFrame2.TextRange.Font.Size = self.LEGEND_FONT_SIZE - 1
         chartApi.Legend.Format.TextFrame2.TextRange.Font.Bold = 1
 
-    def _add_experiment_annotations(self, chartApi, expInfo, timearr, chart_index):
+    def _add_experiment_annotations(self, chartApi, expInfo, timearr, chart_index, withSubaxis):
         """
         添加实验信息标注到图表
 
@@ -1279,10 +1281,17 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         """
         # 获取当前系列数量，用于后续图例删除
         initial_series_count = chartApi.SeriesCollection().Count
+        initial_series_count += 0 if withSubaxis else 1
+
+        # 定义正则表达式，检测activity是否为纯数字
+        pattern = r'^-?\d+(\.\d+)?$'
+
+        ratio = 0.15 # 文字框缩放比例
 
         for nitem, item in enumerate(expInfo['schedule']):
             # 处理时间数据
             time_data = item.get('time')
+            activity = item.get('activity')
             if time_data is None:
                 continue
 
@@ -1297,6 +1306,15 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             # 添加新的数据序列
             y_min = chartApi.Axes(2, 1).MinimumScale
             y_max = chartApi.Axes(2, 1).MaximumScale
+
+            if re.fullmatch(pattern, activity):
+                p_min = y_min
+                p_max = y_max
+            else:
+                scale = y_max - y_min
+                p_min = y_min + scale * ratio
+                p_max = y_max - scale * ratio
+
             series = chartApi.SeriesCollection().NewSeries()
             itemColor = self.hexColor2Int(self.CHART_COLORS[nitem % len(self.CHART_COLORS)])
 
@@ -1305,13 +1323,13 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 t_point = t[0] + (t[1] - t[0]) / 2
 
                 series.XValues = [t[0], t[0], t_point, t[1], t[1], t_point, t[0]]
-                series.Values = [y_min, y_max, y_max, y_max, y_min, y_min, y_min]
+                series.Values = [p_min, p_max, p_max, p_max, p_min, p_min, p_min]
 
             elif len(t) == 1:  # 时间点 - 画线
                 pointIdx = 2 if nitem % 2 == 0 else 1
 
                 series.XValues = [t[0], t[0]]
-                series.Values = [y_min, y_max]
+                series.Values = [p_min, p_max]
             else:
                 # 未知类型，跳过
                 continue
@@ -1327,25 +1345,17 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
             # 在特定图表上添加标签
             if chart_index == 5:  # 第6个图表
-                try:
-                    series.Points(pointIdx).ApplyDataLabels()
-                    series.Points(pointIdx).DataLabel.Text = item["activity"]
-                    series.Points(pointIdx).DataLabel.Font.Size = self.LABEL_FONT_SIZE
-                    series.Points(pointIdx).DataLabel.Font.Bold = 1
-                    series.Points(pointIdx).DataLabel.Format.TextFrame2.TextRange.Font.Fill.ForeColor.RGB = itemColor
-                except:
-                    # 如果标签添加失败，继续处理其他部分
-                    pass
+                series.Points(pointIdx).ApplyDataLabels()
+                series.Points(pointIdx).DataLabel.Text = item["activity"]
+                series.Points(pointIdx).DataLabel.Font.Size = self.LABEL_FONT_SIZE
+                series.Points(pointIdx).DataLabel.Font.Bold = 1
+                series.Points(pointIdx).DataLabel.Format.TextFrame2.TextRange.Font.Fill.ForeColor.RGB = itemColor
 
             # 隐藏图例 - 删除标注线的图例项
-            try:
-                current_series_count = chartApi.SeriesCollection().Count
-                leg = chartApi.Legend.LegendEntries(initial_series_count)
-                leg.Delete()
-            except:
-                # 如果图例删除失败，继续处理
-                print('warning, 删除图例失败')
-                pass
+            current_series_count = chartApi.SeriesCollection().Count
+            leg = chartApi.Legend.LegendEntries(initial_series_count)
+            leg.Delete()
+
 
     def _add_chart_annotations(self, wb, sheetnames, expInfo, Chpath):
         """
