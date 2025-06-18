@@ -775,6 +775,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         if expInfo is None:
             return
 
+        self.GuiRefresh(self.Status, 'Writing relatice height...')
+
         # 定义正则表达式，检测activity是否为纯数字
         pattern = r'^-?\d+(\.\d+)?$'
 
@@ -803,6 +805,243 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
         # relative_height = np.where(np.isnan(relative_height), None, relative_height)
         wb.sheets[sheetnames[7]].range(2, max_col + 1).value = relative_height
+
+    def add_gradient_data(self, wb, sheetnames, expInfo, timearr, C, diffwords, wave):
+        """
+        处理和添加详细实验信息。
+
+        该函数主要执行三大任务：
+        1. 根据实验信息中标记为数值的特定时间段，计算差分吸收光谱的变化率（梯度/斜率）。
+        2. 将计算出的梯度数据，连同时间和序号，一同写入一个名为“梯度分析”的新工作表中，并采用特定格式展示。
+
+        Args:
+            wb (xw.Book): xlwings 的工作簿对象。
+            sheetnames (list): 所有工作表的标准名称列表。
+            expInfo (dict): 解析后的实验信息，包含时间安排和备注。
+            timearr (np.array): 包含所有时间点的一维Numpy数组。
+            C (bool): 中文模式标志，True表示使用中文命名。
+            diffwords (list): 差分对的名称列表 (例如, ['Diff12', 'Diff23'])。
+            wave (list): 波长的名称列表 (例如, ['1050', '1219'])。
+        """
+        # 如果没有实验信息，则直接返回
+        if expInfo is None or not self.gradientCheckBox.isChecked():
+            return
+
+        # --- 1. 初始化和准备 ---
+
+        # 定义工作表名称
+        grad_sheet_name = '时间-斜率' if C else 'Time-Slope'
+        slope_sheet_name = '高度-斜率' if C else 'Height-Slope'
+
+        self.GuiRefresh(self.Status, 'Creating gradient sheets')
+        # 确保“梯度分析”工作表存在，如果不存在则创建
+        if self.gradientCheckBox.isChecked():
+            wb.sheets.add(grad_sheet_name)
+            wb.sheets.add(slope_sheet_name)
+
+        # 获取所需的工作表对象
+        gradient_sheet = wb.sheets[grad_sheet_name]
+        slope_sheet = wb.sheets[slope_sheet_name]
+        diff_abs_sheet = wb.sheets[sheetnames[4]]
+
+        self.GuiRefresh(self.Status, 'Writing headers')
+        # 清理并格式化“梯度分析”表
+        gradient_sheet.clear()
+        gradient_sheet.range('A2').value = ['时间', '周期'] if C else ['Time', 'Cycle']
+        slope_sheet.range('A2').value = '相对高度(cm)'
+
+        # 写入时间和周期数据，并设置时间列的显示格式
+        cycleNoarr = np.arange(1, len(timearr) + 1).reshape(-1, 1)
+        gradient_sheet.range('A3').value = timearr
+        gradient_sheet.range('B3').value = cycleNoarr
+        gradient_sheet.api.Columns("A:A").NumberFormatLocal = "[$-x-systime]h:mm:ss AM/PM"
+
+        # 创建带分隔空列的双行表头
+        header_offset = 2  # A, B列已被时间和序号占用
+        for cs, diff_pair in enumerate(diffwords):
+            # 计算每个差分数据块前分隔列的列号
+            separator_col = header_offset + 1 + cs * (len(wave) + 1)
+            # 在分隔列的第一行写入差分对名称
+            gradient_sheet.range(1, separator_col).value = diff_pair
+            # 在数据列的第二行写入对应的波长名称
+            gradient_sheet.range(2, separator_col + 1).value = wave
+
+            # 在分隔列的第一行写入差分对名称
+            slope_sheet.range(1, separator_col - header_offset + 1).value = diff_pair
+            # 在数据列的第二行写入对应的波长名称
+            slope_sheet.range(2, separator_col - header_offset + 2).value = wave
+
+        # --- 2. 加载光谱数据并准备计算矩阵 ---
+        self.GuiRefresh(self.Status, 'Reading diff abs data')
+        # 从“差分吸光度”表中一次性读取所有相关数据，提高效率
+        try:
+            last_data_col = 4 + 7 * (len(diffwords) - 1) + (len(wave) - 1)
+            all_diff_abs_data = diff_abs_sheet.range((3, 4), (2 + len(timearr), last_data_col)).options(np.array,
+                                                                                                        ndim=2).value
+        except Exception as e:
+            self.GuiRefresh(self.ErrorText, f'读取差分吸光度数据时出错: {e}')
+            return
+
+        # 初始化用于存储计算结果的Numpy矩阵，默认填充NaN
+        num_diff_cols = len(diffwords) * len(wave)
+        relative_height = np.full((len(timearr), 1), np.nan)
+        gradient_matrix = np.full((len(timearr), num_diff_cols), np.nan)
+
+        # 定义用于匹配纯数字活动的正则表达式
+        pattern = r'^-?\d+(\.\d+)?$'
+
+        # --- 3. 核心计算：遍历实验事件，填充矩阵 ---
+        self.GuiRefresh(self.Status, 'Calculating slope...')
+        for item in expInfo['schedule']:
+            time_data = item.get('time')
+            activity = item.get('activity')
+
+            # 只处理有明确起止时间的事件段
+            if not isinstance(time_data, (list, tuple)) or len(time_data) != 2:
+                continue
+
+            # 获取当前时间段在总时间数组中的布尔索引
+            t = [time_data[0] + np.floor(timearr[0]), time_data[1] + np.floor(timearr[0])]
+            index = np.logical_and(timearr >= t[0], timearr < t[1]).flatten()
+
+            # 如果在时间段内无数据点，则跳过
+            if not np.any(index):
+                continue
+
+            # 检查活动是否为纯数字，如果是，则填充“相对高度”矩阵
+            height = float(activity) if re.fullmatch(pattern, activity) else np.nan
+            if not np.isnan(height):
+                relative_height[index] = height
+
+            # 仅当活动为纯数字（如高度值）且数据点大于等于2时，才进行梯度计算
+            if not np.isnan(height) and np.sum(index) >= 2:
+                time_slice = timearr[index].reshape(-1, 1)
+                # 对每一个差分-波长组合进行线性回归
+                for cs in range(len(diffwords)):
+                    for w_idx in range(len(wave)):
+                        # 在原始数据和结果矩阵中找到对应的列索引
+                        numpy_col_idx = (7 * cs) + w_idx
+                        matrix_col_idx = cs * len(wave) + w_idx
+
+                        spec_slice = all_diff_abs_data[index, numpy_col_idx].reshape(-1, 1)
+                        slope, _ = self.calculate_gradient(time_slice, spec_slice)
+
+                        # 将计算出的斜率填充到结果矩阵的相应位置
+                        gradient_matrix[index, matrix_col_idx] = slope
+
+        # --- 4. 结果写入Excel ---
+        self.GuiRefresh(self.Status, 'Writing slope data...')
+        # 去除重复数据，写入sheet中
+        def remove_same_data(matrix):
+            if np.isnan(matrix).any():
+                matrix[np.isnan(matrix)] = 999  # 替换nan为999, 因为999一定不会出现在实验中
+
+            _, unique_index = np.unique(matrix, axis=0, return_index=True)
+            unique_index = np.sort(unique_index)
+            matrix[matrix == 999] = np.nan
+            return matrix[unique_index, :]
+
+        unique_data = remove_same_data(gradient_matrix)
+        unique_height = remove_same_data(relative_height)
+        slope_sheet.range(3, 1).value = unique_height
+
+        # 因存在分隔列，需将梯度矩阵分块写入
+        data_offset = 2  # A, B列已被占用
+        for cs in range(len(diffwords)):
+            # 计算当前数据块在Excel中应写入的起始列
+            start_col = data_offset + 1 + cs * (len(wave) + 1) + 1
+
+            # 从完整的梯度矩阵中切出当前差分对的数据块
+            matrix_start_col = cs * len(wave)
+            matrix_end_col = (cs + 1) * len(wave)
+            data_chunk = gradient_matrix[:, matrix_start_col:matrix_end_col]
+            data_chunk2 = unique_data[:, matrix_start_col:matrix_end_col]
+
+            # 将数据块写入“梯度分析”工作表的正确位置
+            gradient_sheet.range((3, start_col)).value = data_chunk
+            slope_sheet.range((3, start_col - data_offset + 1)).value = data_chunk2
+
+        self.GuiRefresh(self.Status, 'Writing complete')
+
+    def calculate_gradient(self, time, spec, method='lsq', alpha=1.0):
+        """
+        仅使用 NumPy 计算光谱变化的梯度（斜率）和 R²。
+
+        支持普通最小二乘法、岭回归和 Lasso 回归。
+        假设模型为 spec = slope * time + intercept。
+
+        :param time: 时间序列 (1D array)
+        :param spec: 光谱值序列 (1D array)
+        :param method: 拟合方法。可选 'lsq', 'ridge', 或 'lasso'。
+        :param alpha: 岭回归或 Lasso 回归的正则化强度。
+        :return: slope (斜率), r2 (决定系数 R-squared)
+        """
+        assert len(time) == len(spec), "时间和光谱数组的长度必须相等。"
+        n_samples = len(time)
+
+        # --- 核心计算 ---
+
+        if method == 'lsq':
+            # 转换为1D数组
+            time = time.reshape(-1)
+            spec = spec.reshape(-1)
+            w = np.polyfit(time, spec, 1)
+            slope, intercept = w[0], w[1]
+
+        elif method in ('ridge', 'lasso'):
+            # 对于岭回归和 Lasso，为避免对截距进行正则化，我们先中心化数据
+            time_mean = np.mean(time)
+            spec_mean = np.mean(spec)
+            time_c = time - time_mean
+            spec_c = spec - spec_mean
+
+            if method == 'ridge':
+                # 应用岭回归公式计算斜率
+                # slope = Σ(x_c * y_c) / (Σ(x_c²) + α)
+                slope = np.sum(time_c * spec_c) / (np.sum(time_c ** 2) + alpha)
+
+            elif method == 'lasso':
+                # 对单变量问题，Lasso 的解可以通过软阈值函数得到
+                # rho = Σ(x_c * y_c)
+                rho = np.sum(time_c * spec_c)
+
+                # scikit-learn 的 Lasso 目标函数是 (1/(2n)) * ||y-Xw||² + α||w||₁
+                # 这导致阈值为 n * α
+                lambda_ = n_samples * alpha
+
+                sum_sq_time_c = np.sum(time_c ** 2)
+                if sum_sq_time_c == 0:
+                    # 如果所有时间点都相同，斜率无法定义
+                    slope = 0.0
+                elif rho > lambda_:
+                    slope = (rho - lambda_) / sum_sq_time_c
+                elif rho < -lambda_:
+                    slope = (rho + lambda_) / sum_sq_time_c
+                else:
+                    # 如果 rho 的绝对值小于阈值，则斜率被压缩为 0
+                    slope = 0.0
+
+            # 根据中心化前的均值计算截距
+            intercept = spec_mean - slope * time_mean
+
+        else:
+            raise NotImplementedError(
+                "方法 '{}' 未实现。请选择 'lsq', 'ridge', 或 'lasso'。".format(method)
+            )
+
+        # --- R² (决定系数) 计算 ---
+
+        # spec_pred = slope * time + intercept
+        # ss_res = np.sum((spec - spec_pred) ** 2)
+        # ss_tot = np.sum((spec - np.mean(spec)) ** 2)
+        #
+        # if ss_tot == 0:
+        #     r2 = 1.0 if ss_res == 0 else 0.0
+        # else:
+        #     r2 = 1 - (ss_res / ss_tot)
+        r2 = 1
+        return slope, r2
+
 
     def create_charts(self, wb, sheetnames, timearr, wave, Ch, wn, rng_lcol, expInfo, Chpath, C):
         """
@@ -965,8 +1204,9 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             # 12. 处理动态基准周期
             self.handle_dynamic_base_cycle(wb, sheetnames, Ch, n, wn, C)
 
-            # 13. 添加备注数据
+            # 13. 添加备注数据并计算梯度
             self.add_info_data(wb, sheetnames, expInfo, timearr)
+            self.add_gradient_data(wb, sheetnames, expInfo, timearr, C, diffwords, wave)
 
             # 14. 添加血糖数据
             rng_lcol = self.add_glucose_data(wb, sheetnames, timearr, yinterp, C)
@@ -986,6 +1226,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             self.GuiRefresh(self.ErrorText, str(ex))
             self.Process.setEnabled(True)
             try:
+                wb.save()
                 wb.close()
             except Exception as e:
                 pass

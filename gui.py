@@ -95,16 +95,22 @@ class Ui_Data_Processing(object):
         self.DyBCCheckBox.setObjectName("DyBCCheckBox")
 
         self.expInfoCheckBox = QtWidgets.QCheckBox(self.optionsGroup)
-        self.expInfoCheckBox.setGeometry(QtCore.QRect(160, 55, 120, 25))
+        self.expInfoCheckBox.setGeometry(QtCore.QRect(140, 55, 120, 25))
         self.expInfoCheckBox.setFont(font)
         self.expInfoCheckBox.setChecked(False)
         self.expInfoCheckBox.setObjectName("expInfoCheckBox")
 
         self.waveDiffCheckBox = QtWidgets.QCheckBox(self.optionsGroup)
-        self.waveDiffCheckBox.setGeometry(QtCore.QRect(290, 55, 100, 25))
+        self.waveDiffCheckBox.setGeometry(QtCore.QRect(230, 55, 100, 25))
         self.waveDiffCheckBox.setFont(font)
         self.waveDiffCheckBox.setChecked(False)
         self.waveDiffCheckBox.setObjectName("waveDiffCheckBox")
+
+        self.gradientCheckBox = QtWidgets.QCheckBox(self.optionsGroup)
+        self.gradientCheckBox.setGeometry(QtCore.QRect(320, 55, 80, 25))
+        self.gradientCheckBox.setFont(font)
+        self.gradientCheckBox.setChecked(False)
+        self.gradientCheckBox.setObjectName("gradientCheckBox")
 
         # ==================== 参数设置组 ====================
         self.parametersGroup = QtWidgets.QGroupBox(Data_Processing)
@@ -207,6 +213,7 @@ class Ui_Data_Processing(object):
         self.DyBCCheckBox.setText(_translate("Data_Processing", "Dynamic Base"))
         self.expInfoCheckBox.setText(_translate("Data_Processing", "Info for All"))
         self.waveDiffCheckBox.setText(_translate("Data_Processing", "1550-1050"))
+        self.gradientCheckBox.setText(_translate("Data_Processing", "Gradient"))
 
         self.BaseCycleLabel.setText(_translate("Data_Processing", "Base Cycle:"))
 
