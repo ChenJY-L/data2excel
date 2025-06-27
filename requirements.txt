@@ -1,0 +1,12 @@
+# 此文件由 'pip list' 生成，用于 GitHub Actions
+# 核心应用依赖
+numpy
+PyQt6
+python-dateutil
+pywin32
+xlwings
+
+# 构建工具依赖
+Nuitka
+ordered-set
+zstandard
