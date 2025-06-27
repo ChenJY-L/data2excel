@@ -75,3 +75,16 @@ jobs:
         with:
           name: ${{ env.EXE_NAME }}-${{ github.run_number }}
           path: ${{ env.EXE_NAME }}_windows.zip
+          
+      # 修改此步骤以更新固定的 Release
+      - name: Create or Update Release
+        uses: softprops/action-gh-release@v1
+        with:
+          # 使用一个固定的标签名
+          tag_name: "latest"
+          name: "Latest Build (from main branch)"
+          body: "This is the latest automated build. Updated at ${{ env.TIMESTAMP }} UTC."
+          # 允许覆盖上一次的 Release
+          prerelease: true 
+          # 上传打包好的 zip 文件
+          files: ${{ env.EXE_NAME }}_windows.zip
