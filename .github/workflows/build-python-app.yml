@@ -10,6 +10,9 @@ on:
     branches: [ "master" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     # 指定运行环境为 Windows 最新版
