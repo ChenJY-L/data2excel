@@ -634,8 +634,16 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             singlesnrarr = []
 
             for j in datarange:  # len(Chvalues[0])或者n
-                singles = Chvalues[r][j][1:m - 1]
-                single = sum(singles) / (m - 2)
+
+                # ASKME: 为什么这里仅提取了4个值
+                # singles = Chvalues[r][j][1:m - 1]
+                # single = sum(singles) / (m - 2)
+                # 利用时间戳数值远远大于数据的特点，判断时间的索引，提取时间索引前的全部数据
+                raw_data = Chvalues[r][j]
+                time_index = np.nanargmax(raw_data)
+                singles = raw_data[:time_index]
+                single = np.mean(singles)
+
                 singleabs = np.log(basesingle[r][j % 6] / single)
                 singlesnr = single / np.std(singles, ddof=1)
                 singlearr.append(single)
@@ -694,8 +702,16 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 diffsnrarr = np.empty((n, 1))
 
                 for j in datarange:  # len(Chvalues[0])或者n
-                    diffs = np.log(Chvalues[r][j][1:m - 1] / Chvalues[rl][j][1:m - 1])
-                    diff = sum(diffs) / (m - 2)
+
+                    # ASKME: Same
+                    # diffs = np.log(Chvalues[r][j][1:m - 1] / Chvalues[rl][j][1:m - 1])
+                    # diff = sum(diffs) / (m - 2)
+                    raw_data = Chvalues[r][j]
+                    time_index = np.nanargmax(raw_data)
+
+                    diffs = np.log(Chvalues[r][j][:time_index] / Chvalues[rl][j][:time_index])
+                    diff = np.mean(diffs)
+
                     diffabs = diff - basediff[cs][j % 6]
                     diffsnr = 1 / np.std(diffs, ddof=1)
                     diffarr[j] = diff
@@ -1205,8 +1221,10 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             cycleNoarr = np.empty((int(n // wn), 1))
             self.GuiRefresh(self.Status, 'Loading Title')
             for l in range(0, n // wn):
-                timepop = self.popele(Chvalues[0][6 * l:6 * l + wn][:, m - 1], 0)
-                timeele = sum(timepop) / len(timepop)
+                # timepop = self.popele(Chvalues[0][6 * l:6 * l + wn][:, -1], 0)
+                # timeele = sum(timepop) / len(timepop)
+                timepop = np.nanmax(Chvalues[0, 6 * l:6 * l + wn, :])
+                timeele = np.nanmean(timepop)
                 timearr[l] = timeele
                 cycleNoarr[l] = l + 1
 
