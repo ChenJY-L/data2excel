@@ -73,6 +73,9 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
     CHART_COLORS = ['#60966d','#5b3660','#018abe','#e90f44','#63adee','#924c63','#7c8fa3']
     TITLE_BOX_COLOR = (255, 255, 0)  # 标题框背景色（黄色）
 
+    # 阈值
+    ERROR_THRESH = 5e-5
+
     def __init__(self, parent=None):
         """
         初始化GUI界面
@@ -378,6 +381,38 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
         Chvalues = np.asarray(Chvalues)
         return Chvalues, Ch, C, Chpath
+
+    def preprocess_chvalues(self, raw_chvalues_list):
+        """
+        对从xlwings读取的原始Chvalues列表进行预处理。
+        1. 将Python的None值统一替换为NumPy的np.nan。
+        2. 将数据结构转换为一个单一的、类型为float的3D NumPy数组。
+
+        Args:
+            raw_chvalues_list (list): 包含多个二维列表的原始数据。
+
+        Returns:
+            np.ndarray: 一个(Ch, Rows, Cols)形状的、可用于计算的3D NumPy数组。
+        """
+        self.GuiRefresh(self.Status, 'Preprocessing raw data...')
+        try:
+            array_3d = np.asarray(raw_chvalues_list, dtype=object)
+            array_3d[array_3d == None] = np.nan
+            numeric_array = array_3d.astype(float)
+            numeric_array[numeric_array < self.ERROR_THRESH] = np.nan
+            # 将整个数组的类型转换为float，以便进行数学运算
+            return numeric_array
+
+        except Exception as e:
+            # 如果数据形状不规则，上面的方法会失败，这里提供一个备用方案
+            self.GuiRefresh(self.ErrorText, f'Data shape irregular, using fallback. Error: {e}')
+            processed_list = []
+            for ch_data in raw_chvalues_list:
+                arr = np.array(ch_data, dtype=object)
+                arr[arr == None] = np.nan
+                processed_list.append(arr.astype(float))
+            # 注意：如果各环行数不一致，这里可能需要更复杂的处理
+            return np.asarray(processed_list)
 
     def process_temperature_data(self, Chpath, C):
         """
@@ -1126,6 +1161,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
             # 1. 加载和验证数据
             Chvalues, Ch, C, Chpath = self.load_and_validate_data()
+            Chvalues = self.preprocess_chvalues(Chvalues)
             self.currenttime = datetime.datetime.now()
             self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
 
