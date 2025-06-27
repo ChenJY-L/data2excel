@@ -1,0 +1,60 @@
+# .github/workflows/create-release.yml
+
+name: Create GitHub Release
+
+# 触发条件：
+# 当创建一个以 'v' 开头的标签时 (例如 v1.0, v1.2.3)
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    env:
+      PYTHON_VERSION: '3.11'
+      MAIN_SCRIPT_PATH: 'data2excel.py'
+      ICON_PATH: 'favicon01.ico'
+      OUTPUT_DIR: 'build'
+      EXE_NAME: 'data2excel'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+        shell: cmd
+
+      - name: Build with Nuitka
+        run: |
+          python -m nuitka --standalone --remove-output --assume-yes-for-downloads ^
+            --output-dir=${{ env.OUTPUT_DIR }} ^
+            --main=${{ env.MAIN_SCRIPT_PATH }} ^
+            --windows-icon-from-ico=${{ env.ICON_PATH }} ^
+            --enable-plugin=pyqt6 ^
+            --windows-console-mode=disable ^
+            --output-filename=${{ env.EXE_NAME }}.exe
+        shell: cmd
+      
+      - name: Archive Nuitka output for release
+        run: |
+          Compress-Archive -Path "${{ env.OUTPUT_DIR }}\${{ env.EXE_NAME }}.dist\*" -DestinationPath "${{ env.EXE_NAME }}_windows.zip"
+        shell: pwsh
+
+      - name: Create Release and Upload Asset
+        uses: softprops/action-gh-release@v1
+        with:
+          # 这会将打包好的 zip 文件上传到 Release
+          files: ${{ env.EXE_NAME }}_windows.zip
+          # 从 Git 标签自动生成 Release 的标题和内容
+          generate_release_notes: true
