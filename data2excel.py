@@ -232,28 +232,6 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             Cell_Result = Cell_Ran
         return Cell_Result
 
-    def popele(self, arrayin, ele):
-        """
-        从数组中删除特定元素（注意：此函数逻辑可能有问题）
-
-        Args:
-            arrayin: 输入数组
-            ele: 要删除的元素
-
-        Returns:
-            numpy.array: 处理后的数组
-
-        Note:
-            原始逻辑中的条件判断可能有问题，建议重新审查
-        """
-        arrayout = []
-        for index in range(len(arrayin) - 1, -1, -1):
-            if arrayin[index] != ele & np.isnan(arrayin[index]):
-                arrayout.append(arrayin[index])
-        arrayout = np.asarray(arrayout)
-        return arrayout
-
-
     def parseText(self, text):
         """
         解析实验标注文本，提取时间和活动信息
