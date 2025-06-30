@@ -47,7 +47,7 @@ jobs:
       # 第四步：使用 Nuitka 进行编译
       - name: Build with Nuitka (Compressed Single File)
         run: |
-          python -m nuitka --onefile ^
+          python -m nuitka --onefile --remove-output --assume-yes-for-downloads ^
             --windows-disable-console ^
             --enable-plugin=pyqt6 ^
             --lto=yes ^
