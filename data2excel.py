@@ -25,11 +25,11 @@ import datetime  # 时间模块
 # import time
 import os
 import numpy as np
-from PyQt6 import QtWidgets
-from PyQt6.QtWidgets import *
-from PyQt6.QtCore import *
-from PyQt6.QtGui import *
-from PyQt6.QtGui import QIcon
+from PySide6 import QtWidgets
+from PySide6.QtWidgets import *
+from PySide6.QtCore import *
+from PySide6.QtGui import *
+from PySide6.QtGui import QIcon
 import gui as QTUI  # GUI界面模块
 import ico01
 import ctypes

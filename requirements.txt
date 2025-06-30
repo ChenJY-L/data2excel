@@ -1,7 +1,7 @@
 # 此文件由 'pip list' 生成，用于 GitHub Actions
 # 核心应用依赖
 numpy
-PyQt6
+PySide6
 python-dateutil
 pywin32
 xlwings
