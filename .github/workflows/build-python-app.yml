@@ -55,7 +55,7 @@ jobs:
         run: |
           python -m nuitka --onefile --remove-output --assume-yes-for-downloads ^
             --windows-console-mode=disable ^
-            --enable-plugin=pyqt6 ^
+            --enable-plugin=pyside6 ^
             --lto=yes ^
             --output-dir=${{ env.OUTPUT_DIR }} ^
             --output-filename=${{ env.EXE_NAME }} ^
