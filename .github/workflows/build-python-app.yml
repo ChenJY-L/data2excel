@@ -45,25 +45,16 @@ jobs:
         shell: cmd
 
       # 第四步：使用 Nuitka 进行编译
-      # 注意：这里的命令已经根据您的需求和 GitHub Actions 环境做了适配
-      - name: Build with Nuitka
+      - name: Build with Nuitka (Compressed Single File)
         run: |
-#          python -m nuitka --standalone --remove-output --assume-yes-for-downloads ^
-#            --output-dir=${{ env.OUTPUT_DIR }} ^
-#            --main=${{ env.MAIN_SCRIPT_PATH }} ^
-#            --windows-icon-from-ico=${{ env.ICON_PATH }} ^
-#            --enable-plugin=pyqt6 ^
-#            --windows-console-mode=disable ^
-#            --output-filename=${{ env.EXE_NAME }}.exe
-           python -m nuitka --onefile ^
-             --windows-disable-console ^
-             --enable-plugin=pyqt6 ^
-             --lto=yes ^
-             --onefile-compression=zstandard ^
-             --output-dir=${{ env.OUTPUT_DIR }} ^
-             --output-filename=${{ env.EXE_NAME }} ^
-             --main=${{ env.MAIN_SCRIPT_PATH }} ^
-             --windows-icon-from-ico=${{ env.ICON_PATH }}
+          python -m nuitka --onefile ^
+            --windows-disable-console ^
+            --enable-plugin=pyqt6 ^
+            --lto=yes ^
+            --output-dir=${{ env.OUTPUT_DIR }} ^
+            --output-filename=${{ env.EXE_NAME }} ^
+            --main=${{ env.MAIN_SCRIPT_PATH }} ^
+            --windows-icon-from-ico=${{ env.ICON_PATH }}
         shell: cmd
 
       # 第五步：(关于 Enigma Virtual Box)
@@ -87,7 +78,7 @@ jobs:
         with:
           name: ${{ env.EXE_NAME }}-${{ github.run_number }}
           path: ${{ env.EXE_NAME }}_windows.zip
-          
+
       # 修改此步骤以更新固定的 Release
       - name: Create or Update Release
         uses: softprops/action-gh-release@v1
@@ -97,6 +88,6 @@ jobs:
           name: "Latest Build (from main branch)"
           body: "This is the latest automated build. Updated at ${{ env.TIMESTAMP }} UTC."
           # 允许覆盖上一次的 Release
-          prerelease: true 
+          prerelease: true
           # 上传打包好的 zip 文件
           files: ${{ env.EXE_NAME }}_windows.zip
