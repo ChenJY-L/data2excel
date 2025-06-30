@@ -57,15 +57,22 @@ jobs:
             --windows-icon-from-ico=${{ env.ICON_PATH }}
         shell: cmd
 
-      # 修改此步骤以更新固定的 Release
+      # [新增] 第五步：生成时间戳，用于 Release 描述
+      - name: Generate Timestamp
+        id: timestamp
+        run: echo "TIMESTAMP=$(Get-Date -Format 'yyyyMMdd')" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        shell: pwsh
+
+      # [修正] 第六步：创建或更新 Release，并上传正确的文件
       - name: Create or Update Release
         uses: softprops/action-gh-release@v1
         with:
           # 使用一个固定的标签名
           tag_name: "latest"
           name: "Latest Dated Build (${{ env.EXE_NAME }})"
+          # 在 body 中使用上一步生成的时间戳
           body: "This is the latest automated build. Updated at ${{ env.TIMESTAMP }} UTC."
-          # 允许覆盖上一次的 Release
+          # 标记为预发布版本
           prerelease: true
-          # 上传打包好的 zip 文件
-          files: ${{ env.OUTPUT_DIR }}/${{ env.EXE_NAME }}
+          # [修正] 上传打包好的 EXE 文件，路径中添加 .exe 后缀
+          files: ${{ env.OUTPUT_DIR }}/${{ env.EXE_NAME }}.exe
