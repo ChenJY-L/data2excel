@@ -1,57 +1,62 @@
 # .github/workflows/build-python-app.yml
 
-name: Build Python Executable
+name: Build and Release Python Executable
 
 # 触发条件：
-# 1. 当有代码推送到 main 分支时
+# 1. 当有代码推送到 master 分支时
 # 2. 允许在 Actions 页面手动触发此工作流
 on:
   push:
     branches: [ "master" ]
   workflow_dispatch:
+    # [新增] 手动触发时，提供输入参数作为控制开关
+    inputs:
+      createRelease:
+        description: 'Create a release for this build? (Uncheck to only build)'
+        required: true
+        type: boolean
+        default: true
 
 permissions:
   contents: write
 
-jobs:
-  build:
-    # 指定运行环境为 Windows 最新版
-    runs-on: windows-latest
+# [新增] 并发控制
+concurrency:
+  # 使用分支名和工作流名作为分组键
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # 当新的工作流触发时，取消上一个正在运行的
+  cancel-in-progress: true
 
-    # 在此处定义环境变量，方便统一修改
+jobs:
+  # =======================================================
+  # 作业 1: 编译应用程序
+  # =======================================================
+  build:
+    name: Build Executable
+    runs-on: windows-latest
     env:
-      PYTHON_VERSION: '3.11' # 指定使用的 Python 版本
-      MAIN_SCRIPT_PATH: 'data2excel.py' # 您的主程序入口文件（相对路径）
-      ICON_PATH: 'favicon01.ico' # 您的图标文件（相对路径）
-      OUTPUT_DIR: 'build' # Nuitka 输出目录名
-      EXE_NAME: 'data2excel' # 您希望最终生成的 EXE 文件名
+      PYTHON_VERSION: '3.11'
+      MAIN_SCRIPT_PATH: 'data2excel.py'
+      ICON_PATH: 'favicon01.ico'
+      OUTPUT_DIR: 'dist' # 将输出目录名改为更通用的 'dist'
+      EXE_NAME: 'data2excel'
 
     steps:
-      # 第一步：检出您的代码
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 第二步：生成时间戳，用于 Release 描述
-      - name: Generate Timestamp
-        id: timestamp
-        run: echo "TIMESTAMP=$(Get-Date -Format 'yyyyMMdd')" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        shell: pwsh
-
-      # 第三步：设置 Python 环境
       - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      # 第四步：安装项目依赖
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
         shell: cmd
 
-      # 第五步：使用 Nuitka 进行编译
-      - name: Build with Nuitka (Compressed Single File)
+      - name: Build with Nuitka
         run: |
           python -m nuitka --onefile --remove-output --assume-yes-for-downloads ^
             --windows-console-mode=disable ^
@@ -63,12 +68,84 @@ jobs:
             --windows-icon-from-ico=${{ env.ICON_PATH }}
         shell: cmd
 
-      # 第六步：创建或更新 Release，并上传正确的文件
-      - name: Create or Update Release
+      # [修改] 将编译好的文件作为构建产物上传，供后续作业使用
+      - name: Upload Executable Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-executable
+          path: ${{ env.OUTPUT_DIR }}/${{ env.EXE_NAME }}.exe
+
+  # =======================================================
+  # 作业 2: 创建 Release 并上传文件
+  # =======================================================
+  release:
+    name: Create GitHub Release
+    needs: build
+    if: github.event_name == 'push' || github.event.inputs.createRelease == true
+    runs-on: windows-latest
+    env:
+      OUTPUT_DIR: 'dist'
+      EXE_NAME: 'data2excel'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download Executable Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-executable
+          path: ${{ env.OUTPUT_DIR }}
+
+      - name: Generate Timestamp
+        id: timestamp
+        run: echo "TIMESTAMP=$(Get-Date -Format 'yyyyMMdd-HHmm')" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        shell: pwsh
+
+      - name: Generate Release Notes
+        id: generate_notes
+        run: |
+          # [优化] 明确查找以 'v' 开头的最新标签，以忽略 'latest' 标签
+          $LATEST_TAG = git tag --sort=-v:refname --list "v*" | Select-Object -First 1
+          if ($LATEST_TAG) {
+            Write-Host "Last versioned tag found: $LATEST_TAG"
+            $NOTES = git log $LATEST_TAG..HEAD --pretty=format:"* %s"
+          } else {
+            Write-Host "No versioned tags found, using full history for notes."
+            $NOTES = git log --pretty=format:"* %s"
+          }
+          if (-not $NOTES) {
+            $NOTES = "Automated build with no new commits detected since last tag."
+          }
+          $NOTES = $NOTES -replace '%', '%25' -replace "`n", '%0A' -replace "`r", '%0D'
+          echo "NOTES=$NOTES" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        shell: pwsh
+
+      - name: Create New Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: "build-${{ env.TIMESTAMP }}"
-          name: "Build ${{ env.TIMESTAMP }}"
-          body: "This is the latest automated build. Updated at ${{ env.TIMESTAMP }} UTC."
-          prerelease: true
+          tag_name: "v${{ env.TIMESTAMP }}"
+          name: "Release v${{ env.TIMESTAMP }}"
+          body: |
+            ## 本次更新内容
+            
+            ${{ env.NOTES }}
+          
+            ---
+            *此版本由 GitHub Actions 自动构建和发布。*
+          prerelease: false
           files: ${{ env.OUTPUT_DIR }}/${{ env.EXE_NAME }}.exe
+
+      # [新增] 最后一步，移动 'latest' 标签以指向刚刚创建的新版本
+      - name: Update 'latest' Tag
+        run: |
+          # [新增] 配置 Git 用户信息
+          git config user.name "GitHub Actions Bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 强制更新本地的 'latest' 标签，使其指向新的时间戳标签
+          git tag -f latest v${{ env.TIMESTAMP }}
+          # 强制将 'latest' 标签推送到远程仓库，覆盖旧的 'latest' 标签
+          git push origin latest --force
