@@ -48,13 +48,22 @@ jobs:
       # 注意：这里的命令已经根据您的需求和 GitHub Actions 环境做了适配
       - name: Build with Nuitka
         run: |
-          python -m nuitka --standalone --remove-output --assume-yes-for-downloads ^
-            --output-dir=${{ env.OUTPUT_DIR }} ^
-            --main=${{ env.MAIN_SCRIPT_PATH }} ^
-            --windows-icon-from-ico=${{ env.ICON_PATH }} ^
-            --enable-plugin=pyqt6 ^
-            --windows-console-mode=disable ^
-            --output-filename=${{ env.EXE_NAME }}.exe
+#          python -m nuitka --standalone --remove-output --assume-yes-for-downloads ^
+#            --output-dir=${{ env.OUTPUT_DIR }} ^
+#            --main=${{ env.MAIN_SCRIPT_PATH }} ^
+#            --windows-icon-from-ico=${{ env.ICON_PATH }} ^
+#            --enable-plugin=pyqt6 ^
+#            --windows-console-mode=disable ^
+#            --output-filename=${{ env.EXE_NAME }}.exe
+           python -m nuitka --onefile ^
+             --windows-disable-console ^
+             --enable-plugin=pyqt6 ^
+             --lto=yes ^
+             --onefile-compression=zstandard ^
+             --output-dir=${{ env.OUTPUT_DIR }} ^
+             --output-filename=${{ env.EXE_NAME }} ^
+             --main=${{ env.MAIN_SCRIPT_PATH }} ^
+             --windows-icon-from-ico=${{ env.ICON_PATH }}
         shell: cmd
 
       # 第五步：(关于 Enigma Virtual Box)
