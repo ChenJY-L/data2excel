@@ -1421,8 +1421,11 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             chartApi.Axes(1).MinimumScale = timearr.min() - ratio * (timearr.max() - timearr.min())
             chartApi.Axes(1).MaximumScale = timearr.max() + ratio * (timearr.max() - timearr.min())
 
-            # 添加副坐标轴数据
+            # 统一设置线宽
             series_count = chartApi.SeriesCollection().Count
+            chartApi.FullSeriesCollection(series_count).Format.Line.Weight = 3.0
+
+            # 添加副坐标轴数据
             if secrange is not None:
                 if int(tempindex[p]) > rng_lcol:  # 血糖数据特殊处理
                     chartApi.SeriesCollection().Add(Source=secrange.api, SeriesLabels=True)
