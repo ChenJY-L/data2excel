@@ -63,6 +63,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
     LABEL_FONT_SIZE = 28    # 标签字体大小
 
     # 图表样式配置
+    LINE_WEIGHT = 1.5              # 线宽
     CHART_BORDER_COLOR = 14277081  # 图表边框颜色
     GRID_COLOR = 14277081          # 网格线颜色
     GRID_WEIGHT = 0.75             # 网格线粗细
@@ -1421,10 +1422,6 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             chartApi.Axes(1).MinimumScale = timearr.min() - ratio * (timearr.max() - timearr.min())
             chartApi.Axes(1).MaximumScale = timearr.max() + ratio * (timearr.max() - timearr.min())
 
-            # 统一设置线宽
-            series_count = chartApi.SeriesCollection().Count
-            chartApi.FullSeriesCollection(series_count).Format.Line.Weight = 1.5
-
             # 添加副坐标轴数据
             if secrange is not None:
                 if int(tempindex[p]) > rng_lcol:  # 血糖数据特殊处理
@@ -1439,11 +1436,13 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                     chartApi.FullSeriesCollection(series_count).Format.Line.ForeColor.RGB = 255
                     chartApi.FullSeriesCollection(series_count).MarkerBackgroundColor = 255
                     chartApi.FullSeriesCollection(series_count).MarkerForegroundColor = 255
+                    chartApi.SeriesCollection(series_count).Format.Line.Weight = self.LINE_WEIGHT
                 else:  # 普通温度数据
                     chartApi.SeriesCollection().Add(Source=secrange.api, SeriesLabels=True)
                     chartApi.ChartColor = 10
                     series_count = chartApi.SeriesCollection().Count
                     chartApi.SeriesCollection(series_count).AxisGroup = 2
+                    chartApi.SeriesCollection(series_count).Format.Line.Weight = self.LINE_WEIGHT
 
             # 设置系列标记样式
             for i in range(1, chartApi.SeriesCollection().Count + 1):
@@ -1544,6 +1543,11 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         # 图例
         chartApi.Legend.Format.TextFrame2.TextRange.Font.Size = self.LEGEND_FONT_SIZE - 1
         chartApi.Legend.Format.TextFrame2.TextRange.Font.Bold = 1
+
+        # 统一设置线宽
+        series_count = chartApi.SeriesCollection().Count
+        for count in range(1, series_count):
+            chartApi.FullSeriesCollection(count).Format.Line.Weight = self.LINE_WEIGHT
 
     def _add_experiment_annotations(self, chartApi, expInfo, timearr, chart_index, withSubaxis):
         """
