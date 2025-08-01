@@ -75,7 +75,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
     TITLE_BOX_COLOR = (255, 255, 0)  # 标题框背景色（黄色）
 
     # 阈值
-    ERROR_THRESH = 5e-5
+    ERROR_THRESH = 5e-6
 
     def __init__(self, parent=None):
         """
@@ -378,7 +378,12 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             array_3d = np.asarray(raw_chvalues_list, dtype=object)
             array_3d[array_3d == None] = np.nan
             numeric_array = array_3d.astype(float)
-            numeric_array[numeric_array < self.ERROR_THRESH] = np.nan
+            if not self.LDCheckBox.isChecked():
+                numeric_array[numeric_array < self.ERROR_THRESH] = np.nan
+            else:
+                rows_to_remove = numeric_array[1, :, -1] == 0
+                # 使用反向掩码（~）来保留所有不包含NaN的行
+                numeric_array = numeric_array[:, ~rows_to_remove, :]
             # 将整个数组的类型转换为float，以便进行数学运算
             return numeric_array
 
@@ -614,16 +619,13 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
             for j in datarange:  # len(Chvalues[0])或者n
 
-                # ASKME: 为什么这里仅提取了4个值
-                # singles = Chvalues[r][j][1:m - 1]
-                # single = sum(singles) / (m - 2)
                 # 利用时间戳数值远远大于数据的特点，判断时间的索引，提取时间索引前的全部数据
                 raw_data = Chvalues[r][j]
                 time_index = np.nanargmax(raw_data)
                 singles = raw_data[:time_index]
                 single = np.mean(singles)
 
-                singleabs = np.log(basesingle[r][j % 6] / single)
+                singleabs = np.log(basesingle[r][j % wn] / single)
                 singlesnr = single / np.std(singles, ddof=1)
                 singlearr.append(single)
                 singleabsarr.append(singleabs)
@@ -691,7 +693,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                     diffs = np.log(Chvalues[r][j][:time_index] / Chvalues[rl][j][:time_index])
                     diff = np.mean(diffs)
 
-                    diffabs = diff - basediff[cs][j % 6]
+                    diffabs = diff - basediff[cs][j % wn]
                     diffsnr = 1 / np.std(diffs, ddof=1)
                     diffarr[j] = diff
                     diffabsarr[j] = diffabs
@@ -771,6 +773,11 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         Returns:
             int: 血糖数据列的索引
         """
+
+        # 如果明确是LD数据则不添加血糖值
+        if self.LDCheckBox.isChecked():
+            return
+
         try:
             rng_lcol = len(yinterp[1]) + 3
         except:
@@ -1174,9 +1181,9 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             # 根据LD选项确定波长
             if self.LDCheckBox.isChecked():
                 wave = ['1064', '1310', '1390', '1550', '1625']
-                for i in range(len(datarange) - 1, -1, -1):
-                    if (datarange[i] % 6 == 5):
-                        del datarange[i]
+                # for i in range(len(datarange) - 1, -1, -1):
+                #     if (datarange[i] % 6 == 5):
+                #         del datarange[i]
             else:
                 wave = ['1050', '1219', '1314', '1409', '1550', '1609']
 
