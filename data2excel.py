@@ -110,6 +110,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         # 初始化图表列表
         self.charts = []
 
+        self.isInfo = False
+
     # ==================== 工具函数区 ====================
 
     def GuiRefresh(self, textbox, text):
@@ -444,9 +446,12 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             # 读取第一个txt文件
             text = Path(txtFiles[0]).read_text(encoding='utf-8')
             expInfo = self.parseText(text)
+
+            self.isInfo = True
             return expInfo
         else:
             # 没有txt文件，跳过
+            self.isInfo = False
             return None
 
     def calculate_base_data(self, Chvalues, Ch, wn, m):
@@ -505,7 +510,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                                                                      'Differential Absorbance', 'Differential SNR',
                                                                      'Summary of Intensity and SNR', 'Temperature']
         self.GuiRefresh(self.Status, 'Creating Sheets')
-        if self.TempCheckBox.isChecked():
+        if self.TempCheckBox.isChecked() or self.isInfo: # 存在备注或选中温度选项时，创建`温度数据` Sheet
             sheetNo = len(sheetnames)
         else:
             sheetNo = len(sheetnames) - 1
@@ -560,6 +565,9 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 yinterp[:, i - 1] = np.interp(timearr, Tempvalue[:, 0], Tempvalue[:, i]).reshape(timearr.shape[0], )
             wb.sheets[sheetnames[len(sheetnames) - 1]].range(2, 3).value = yinterp
             self.GuiRefresh(self.Status, 'Writing Temp Data')
+        else:
+            wb.sheets[sheetnames[len(sheetnames) - 1]].range(2, 1).value = timearr
+            wb.sheets[sheetnames[len(sheetnames) - 1]].range(2, 2).value = cycleNoarr
         wb.save()
 
         return yinterp
@@ -1118,9 +1126,14 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                       'Diff34', 'Diff45', '1314', '1409',
                       'Diff1050', 'Diff1550-Diff1050', '1550', '1609']
 
-        tempindex = ['4', '5', '0', '0',
-                     '15', '31', '0', '0',
-                     '12', '0', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
+        if self.TempCheckBox.isChecked():
+            tempindex = ['4', '5', '0', '0',
+                         '15', '31', '0', '0',
+                         '12', '0', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
+        else:
+            tempindex = ['0', '0', '0', '0',
+                         '0', '3', '0', '0',
+                         '0', '0', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
 
         infoindex = [False, False, False, False,
                      True, True, True, True,
