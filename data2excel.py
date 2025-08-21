@@ -97,6 +97,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         # self.DyBCCheckBox.setChecked(True)
         self.waveDiffCheckBox.setChecked(True)
         self.expInfoCheckBox.setChecked(True)
+        self.replace1314CheckBox.setChecked(True)
 
         # 连接信号和槽函数
         self.Process.clicked.connect(self.DataProcess)
@@ -307,6 +308,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         }
 
     # ==================== 数据处理子函数区 ====================
+    def get_data_rage(self, ):
+        pass
 
     def load_and_validate_data(self):
         """
@@ -1145,6 +1148,11 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             charttitles[5] = '45环差分信号vs.血糖真值'
             charttitles[10] = '1550nm单环吸光度vs.血糖真值'
 
+        if self.replace1314CheckBox.isChecked():
+            charttitles[6] = '1050nm单环吸光度vs.1050nm差分吸光度&1550nm差分吸光度'
+            ringsindex[6] = '1050-5'
+            tempindex[6] = ['Diff45 1050', 'Diff45 1550']
+
         pltN = len(charttitles)
         SRRange = 'A1:ZZ2'
         diffSheet = wb.sheets[sheetnames[4]]
@@ -1317,12 +1325,23 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             # 确定数据源范围
             PltRangeS = 'A:A'  # 时间列
 
-            if len(each) == 6:  # 差分数据，如'Diff12'
+            # 副座标轴Series个数
+            secondary_axis_series_count = 0
+
+            if len(each) == 6 and '-' not in each:  # 差分数据，如'Diff12'
                 datasheet = diffSheet
                 addr = self.FindRowColRange(datasheet, 'Col', each, SRRange)
                 addrstr = xw.utils.col_name(int(addr) + 1) + ':' + xw.utils.col_name(int(addr) + wn)
                 PltRangeS = PltRangeS + ', ' + addrstr
                 ytitle = 'ΔAd'
+
+            elif len(each) == 6 and '-' in each:  # 提取特定的单环数据
+                datasheet = sglSheet
+                addr = self.FindRowColRange(datasheet, 'Col', each[0:4], SRRange)
+                ring_num = int(each[-1]) - 1
+                addrstr = xw.utils.col_name(int(addr) + 7 * ring_num) + ':' + xw.utils.col_name(int(addr) + 7 * ring_num)
+                PltRangeS = PltRangeS + ', ' + addrstr
+                ytitle = 'ΔA'
 
             elif len(each) == 4:  # 单环数据，如'1050'
                 datasheet = sglSheet
@@ -1389,20 +1408,47 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
             # 设置副坐标轴数据范围
             secrange = None
-            if int(tempindex[p]) != 0:
-                if int(tempindex[p]) > rng_lcol:  # 血糖数据
-                    secaddr = xw.utils.col_name(int(tempindex[p]))
+            try:
+                temp_col = int(tempindex[p])
+            except TypeError:
+                # 设置副坐标轴为光谱数据
+                temp_col = -1
+                secaddrstr = None
+                if 'Diff' in tempindex[p][0]:
+                    datasheet = diffSheet
+                else:
+                    datasheet = sglSheet
+
+                addr_list = []
+                for wave_target in tempindex[p]:
+                    # 差分数据
+                    wave_index = wave.index(wave_target[-4:]) + 1
+                    addr = self.FindRowColRange(datasheet, 'Col', wave_target[:6], SRRange)
+                    addrstr = xw.utils.col_name(int(addr) + wave_index) + ':' + xw.utils.col_name(
+                        int(addr) + wave_index)
+                    if secaddrstr is not None:
+                        secaddrstr = secaddrstr + ', ' + addrstr
+                    else:
+                        secaddrstr = addrstr
+
+                    addr_list.append(addrstr)
+
+                secrange = datasheet.range(secaddrstr)
+
+            if temp_col > 0:
+                if temp_col > rng_lcol:  # 血糖数据
+                    secaddr = xw.utils.col_name(temp_col)
                     secaddrstr = secaddr + ':' + secaddr
                     SecRangeS = secaddrstr
                     secrange = tempSheet.range(SecRangeS)
                 else:  # 温度数据
-                    secaddr = xw.utils.col_name(int(tempindex[p]))
+                    secaddr = xw.utils.col_name(temp_col)
                     secaddrstr = secaddr + ':' + secaddr
                     SecRangeS = secaddrstr
                     secrange = tempSheet.range(SecRangeS)
 
             self.GuiRefresh(self.Status, 'Plotting ' + str(p + 1) + '/' + str(pltN))
-
+            # print()
             # 计算图表位置 - 为了解决diff1050和diff1550-diff1050绘图位置的问题
             # if len(each) <= 8:
             #     figure_lft = self.CHART_LEFT + self.CHART_WIDTH * int(p % 4)
@@ -1444,7 +1490,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
             # 添加副坐标轴数据
             if secrange is not None:
-                if int(tempindex[p]) > rng_lcol:  # 血糖数据特殊处理
+                if temp_col > rng_lcol:  # 血糖数据特殊处理
                     chartApi.SeriesCollection().Add(Source=secrange.api, SeriesLabels=True)
                     series_count = chartApi.SeriesCollection().Count
                     chartApi.FullSeriesCollection(series_count).Name = "=" + sheetnames[7] + "!" + xw.utils.col_name(rng_lcol + 2) + "1"
@@ -1457,12 +1503,34 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                     chartApi.FullSeriesCollection(series_count).MarkerBackgroundColor = 255
                     chartApi.FullSeriesCollection(series_count).MarkerForegroundColor = 255
                     chartApi.SeriesCollection(series_count).Format.Line.Weight = self.LINE_WEIGHT
+                    secondary_axis_series_count += 1
                 else:  # 普通温度数据
-                    chartApi.SeriesCollection().Add(Source=secrange.api, SeriesLabels=True)
-                    chartApi.ChartColor = 10
-                    series_count = chartApi.SeriesCollection().Count
-                    chartApi.SeriesCollection(series_count).AxisGroup = 2
-                    chartApi.SeriesCollection(series_count).Format.Line.Weight = self.LINE_WEIGHT
+                    if isinstance(tempindex[p], list):
+                        last_row = datasheet.used_range.last_cell.row
+                        x_range = datasheet.range(f'A3:A{last_row}')
+
+                        for addr, wave_target in zip(addr_list, tempindex[p]):
+                            new_series = chartApi.SeriesCollection().NewSeries()
+                            new_series.Name = wave_target
+                            column_letter = addr.split(':')[0]
+                            y_range = datasheet.range(f'{column_letter}3:{column_letter}{last_row}')
+
+                            # 5. 将精确范围的 .api 属性赋值给系列
+                            new_series.XValues = x_range.api
+                            new_series.Values = y_range.api
+
+                            # 6. 将新系列分配给副坐标轴并设置格式
+                            new_series.AxisGroup = 2
+                            new_series.Format.Line.Weight = self.LINE_WEIGHT
+                            secondary_axis_series_count += 1
+
+                    else:
+                        chartApi.SeriesCollection().Add(Source=secrange.api, SeriesLabels=True)
+                        chartApi.ChartColor = 10
+                        series_count = chartApi.SeriesCollection().Count
+                        chartApi.SeriesCollection(series_count).AxisGroup = 2
+                        chartApi.SeriesCollection(series_count).Format.Line.Weight = self.LINE_WEIGHT
+                        secondary_axis_series_count += 1
 
             # 设置系列标记样式
             for i in range(1, chartApi.SeriesCollection().Count + 1):
@@ -1470,13 +1538,13 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 series.MarkerStyle = 8  # 圆形标记
                 series.MarkerSize = 5
 
-            self._configure_chart_appearance(chartApi, charttitles[p], ytitle, tempindex[p],
+            self._configure_chart_appearance(chartApi, charttitles[p], ytitle, temp_col,
                                            wb, sheetnames, rng_lcol)
 
             # 添加实验信息标注
             if expInfo and (self.expInfoCheckBox.isChecked() or infoindex[p]):
-                with_subaxis = False if int(tempindex[p]) == 0 else True
-                self._add_experiment_annotations(chartApi, expInfo, timearr, p, with_subaxis)
+                with_subaxis = False if temp_col <= 0 else True
+                self._add_experiment_annotations(chartApi, expInfo, timearr, p, secondary_axis_series_count)
 
             self.currenttime = datetime.datetime.now()
             self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
@@ -1546,7 +1614,10 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         if int(temp_index) != 0:
             # Y2轴标题
             chartApi.Axes(2, 2).HasTitle = True
-            chartApi.Axes(2, 2).AxisTitle.Characters.Text = wb.sheets[sheetnames[7]].range(1, int(temp_index)).value
+            if temp_index == -1:
+                chartApi.Axes(2, 2).AxisTitle.Characters.Text = 'ΔAd'
+            else:
+                chartApi.Axes(2, 2).AxisTitle.Characters.Text = wb.sheets[sheetnames[7]].range(1, int(temp_index)).value
             chartApi.Axes(2, 2).AxisTitle.Format.TextFrame2.TextRange.Font.Name = "Calibri"
             chartApi.Axes(2, 2).AxisTitle.Format.TextFrame2.TextRange.Font.Size = self.AXIS_TITLE_FONT_SIZE
             chartApi.Axes(2, 2).AxisTitle.Format.TextFrame2.TextRange.Font.Bold = 1
@@ -1569,7 +1640,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         for count in range(1, series_count):
             chartApi.FullSeriesCollection(count).Format.Line.Weight = self.LINE_WEIGHT
 
-    def _add_experiment_annotations(self, chartApi, expInfo, timearr, chart_index, withSubaxis):
+    def _add_experiment_annotations(self, chartApi, expInfo, timearr, chart_index, secondary_axis_series_count):
         """
         添加实验信息标注到图表
 
@@ -1580,8 +1651,9 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             chart_index: 图表索引
         """
         # 获取当前系列数量，用于后续图例删除
-        initial_series_count = chartApi.SeriesCollection().Count
-        initial_series_count += 0 if withSubaxis else 1
+        initial_series_count = chartApi.SeriesCollection().Count + 1
+        # initial_series_count += 0 if withSubaxis else 1
+        initial_series_count -= secondary_axis_series_count
 
         # 定义正则表达式，检测activity是否为纯数字
         pattern = r'^-?\d+(\.\d+)?$'

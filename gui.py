@@ -112,6 +112,12 @@ class Ui_Data_Processing(object):
         self.gradientCheckBox.setChecked(False)
         self.gradientCheckBox.setObjectName("gradientCheckBox")
 
+        self.replace1314CheckBox = QtWidgets.QCheckBox(self.optionsGroup)
+        self.replace1314CheckBox.setGeometry(QtCore.QRect(410, 25, 100, 25))
+        self.replace1314CheckBox.setFont(font)
+        self.replace1314CheckBox.setChecked(False)
+        self.replace1314CheckBox.setObjectName("mainwaveCheckBox")
+
         # ==================== 参数设置组 ====================
         self.parametersGroup = QtWidgets.QGroupBox(Data_Processing)
         self.parametersGroup.setGeometry(QtCore.QRect(10, 210, 280, 60))
@@ -214,6 +220,7 @@ class Ui_Data_Processing(object):
         self.expInfoCheckBox.setText(_translate("Data_Processing", "Info for All"))
         self.waveDiffCheckBox.setText(_translate("Data_Processing", "1550-1050"))
         self.gradientCheckBox.setText(_translate("Data_Processing", "Gradient"))
+        self.replace1314CheckBox.setText(_translate("Data_Processing", "Replace1314"))
 
         self.BaseCycleLabel.setText(_translate("Data_Processing", "Base Cycle:"))
 
