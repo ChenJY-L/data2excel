@@ -308,8 +308,6 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         }
 
     # ==================== 数据处理子函数区 ====================
-    def get_data_rage(self, ):
-        pass
 
     def load_and_validate_data(self):
         """
@@ -1448,7 +1446,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                     secrange = tempSheet.range(SecRangeS)
 
             self.GuiRefresh(self.Status, 'Plotting ' + str(p + 1) + '/' + str(pltN))
-            # print()
+
             # 计算图表位置 - 为了解决diff1050和diff1550-diff1050绘图位置的问题
             # if len(each) <= 8:
             #     figure_lft = self.CHART_LEFT + self.CHART_WIDTH * int(p % 4)
