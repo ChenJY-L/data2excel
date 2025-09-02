@@ -476,10 +476,10 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         for w in range(0, wn):
             cs = -1
             for r in range(0, Ch):
-                basesingle[r][w] = sum(Chvalues[r][(self.BaseCycle.value() - 1) * 6 + w][1:m - 1]) / (m - 2)
+                basesingle[r][w] = sum(Chvalues[r][(self.BaseCycle.value() - 1) * 6 + w][:m - 1]) / (m - 1)
                 for rl in range(r + 1, Ch):
                     cs = cs + 1
-                    basediff[cs][w] = sum(np.log(Chvalues[r][(self.BaseCycle.value() - 1) * 6 + w][1:m - 1] / Chvalues[rl][(self.BaseCycle.value() - 1) * 6 + w][1:m - 1])) / (m - 2)
+                    basediff[cs][w] = sum(np.log(Chvalues[r][(self.BaseCycle.value() - 1) * 6 + w][:m - 1] / Chvalues[rl][(self.BaseCycle.value() - 1) * 6 + w][:m - 1])) / (m - 1)
 
         return basesingle, basediff
 
