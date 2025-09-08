@@ -1651,7 +1651,9 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         # 获取当前系列数量，用于后续图例删除
         initial_series_count = chartApi.SeriesCollection().Count + 1
         # initial_series_count += 0 if withSubaxis else 1
-        initial_series_count -= secondary_axis_series_count
+        initial_series_count -= secondary_axis_series_count if secondary_axis_series_count <= 0 else 0
+        axis_index = 2 if secondary_axis_series_count > 0 else 1
+        target_axis = chartApi.Axes(2, axis_index)
 
         # 定义正则表达式，检测activity是否为纯数字
         pattern = r'^-?\d+(\.\d+)?$'
@@ -1674,8 +1676,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 continue
 
             # 添加新的数据序列
-            y_min = chartApi.Axes(2, 1).MinimumScale
-            y_max = chartApi.Axes(2, 1).MaximumScale
+            y_min = target_axis.MinimumScale
+            y_max = target_axis.MaximumScale
 
             if re.fullmatch(pattern, activity):
                 p_min = y_min
@@ -1686,6 +1688,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 p_max = y_max - scale * ratio
 
             series = chartApi.SeriesCollection().NewSeries()
+            series.AxisGroup = axis_index
             itemColor = self.hexColor2Int(self.CHART_COLORS[nitem % len(self.CHART_COLORS)])
 
             if len(t) == 2:  # 时间段 - 画框
@@ -1704,8 +1707,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 # 未知类型，跳过
                 continue
 
-            chartApi.Axes(2, 1).MinimumScale = y_min
-            chartApi.Axes(2, 1).MaximumScale = y_max
+            target_axis.MinimumScale = y_min
+            target_axis.MaximumScale = y_max
 
             # 设置序列格式
             series.ChartType = 75  # xlLine
@@ -1720,6 +1723,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 series.Points(pointIdx).DataLabel.Font.Size = self.LABEL_FONT_SIZE
                 series.Points(pointIdx).DataLabel.Font.Bold = 1
                 series.Points(pointIdx).DataLabel.Format.TextFrame2.TextRange.Font.Fill.ForeColor.RGB = itemColor
+                series.Points(pointIdx).DataLabel.Position = xw.constants.DataLabelPosition.xlLabelPositionCenter
 
             # 隐藏图例 - 删除标注线的图例项
             current_series_count = chartApi.SeriesCollection().Count
