@@ -496,8 +496,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         """
         self.GuiRefresh(self.Status, 'Creating Output File')
         ProcessFilePath = os.path.join(Chpath.replace(Chpath.split('\\')[-1], ''),
-                                       Chpath.split('\\')[-2] + '.xlsx') if C else (
-                                       Chpath.split('Ch')[0] + 'Processed' + '.xlsx')
+                                       Chpath.split('\\')[-2] + '.xlsm') if C else (
+                                       Chpath.split('Ch')[0] + 'Processed' + '.xlsm')
 
         if os.path.isfile(ProcessFilePath) == False:
             wb = self.xwapp.books.add()  # 在app下创建一个Book
@@ -1088,6 +1088,36 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         r2 = 1
         return slope, r2
 
+    def create_refresh_button(self, wb, sheetnames, expInfo):
+        """
+        添加刷新按键
+        默认添加到固定位置，调用固定的vba
+
+        Args:
+            wb: Excel工作簿对象
+            sheetnames: 工作表名称列表
+        """
+        if expInfo is None:
+            return
+
+        self.GuiRefresh(self.Status, "Adding refresh button... ")
+
+        button_text = '刷新标注框'
+        macro_name = "Updater.xlam!ChartAnnotationUpdater.RefreshAllChartAnnotations"  # 绑定的宏（如需模块前缀，加上 ModuleName.）
+
+        # 按钮位置与大小（像素）
+        left, top, width, height = self.CHART_LEFT + self.CHART_WIDTH*4, self.CHART_TOP, 160, 100
+        ws = wb.sheets[sheetnames[4]]
+
+        # 添加一个“表单控件按钮”
+        btn = ws.api.Buttons().Add(left, top, width, height)
+        btn.Characters.Text = button_text
+        btn.OnAction = macro_name
+
+        btn.ShapeRange.Fill.ForeColor.RGB = xw.utils.rgb_to_int(self.TITLE_BOX_COLOR)
+        btn.Characters.Font.Name = "Times New Roman"
+        btn.Characters.Font.Size = self.MAIN_TITLE_FONT_SIZE
+        btn.Characters.Font.Bold = 1
 
     def create_charts(self, wb, sheetnames, timearr, wave, Ch, wn, rng_lcol, expInfo, Chpath, C):
         """
@@ -1141,9 +1171,9 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                      False, False, False, False]
 
         if self.OGTTCheckBox.isChecked():  # OGTT时的血糖值绘制准备
-            tempindex[5] = str(rng_lcol + 2)
+            # tempindex[5] = str(rng_lcol + 2)
             tempindex[10] = str(rng_lcol + 2)
-            charttitles[5] = '45环差分信号vs.血糖真值'
+            # charttitles[5] = '45环差分信号vs.血糖真值'
             charttitles[10] = '1550nm单环吸光度vs.血糖真值'
 
         if self.replace1314CheckBox.isChecked():
@@ -1492,8 +1522,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                     chartApi.SeriesCollection().Add(Source=secrange.api, SeriesLabels=True)
                     series_count = chartApi.SeriesCollection().Count
                     chartApi.FullSeriesCollection(series_count).Name = "=" + sheetnames[7] + "!" + xw.utils.col_name(rng_lcol + 2) + "1"
-                    chartApi.FullSeriesCollection(series_count).XValues = "=" + sheetnames[7] + "!" + xw.utils.col_name(rng_lcol + 1) + ":" + xw.utils.col_name(rng_lcol + 1)
-                    chartApi.FullSeriesCollection(series_count).Values = "=" + sheetnames[7] + "!" + xw.utils.col_name(rng_lcol + 2) + ":" + xw.utils.col_name(rng_lcol + 2)
+                    chartApi.FullSeriesCollection(series_count).XValues = "=" + sheetnames[7] + "!" + xw.utils.col_name(rng_lcol + 1) + "2:" + xw.utils.col_name(rng_lcol + 1) + str(len(timearr))
+                    chartApi.FullSeriesCollection(series_count).Values = "=" + sheetnames[7] + "!" + xw.utils.col_name(rng_lcol + 2) + "2:" + xw.utils.col_name(rng_lcol + 2) + str(len(timearr))
                     chartApi.SeriesCollection(series_count).AxisGroup = 2
                     chartApi.Axes(2, 2).ReversePlotOrder = True
                     chartApi.ChartColor = 10
@@ -1550,6 +1580,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         # 添加备注和标题
         self._add_chart_annotations(wb, sheetnames, expInfo, Chpath)
 
+        # 添加刷新按键函数
+        # self.create_refresh_button(wb, sheetnames, expInfo)
         self.GuiRefresh(self.Status, 'Saving...')
         wb.save()
 
@@ -1715,6 +1747,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             series.Format.Line.Weight = self.ANNOTATION_LINE_WEIGHT
             series.Format.Line.DashStyle = 4  # 虚线
             series.Format.Line.ForeColor.RGB = itemColor
+            series.Name = f"_ANNOTATION_BOX_{nitem}"
 
             # 在特定图表上添加标签
             if chart_index == 5:  # 第6个图表
