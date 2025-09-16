@@ -1312,12 +1312,23 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
         # 错误处理
         except Exception as ex:
+            import traceback, sys
             self.GuiRefresh(self.ErrorText, str(ex))
+
+            # 打印完整堆栈信息
+            self.GuiRefresh(self.ErrorText, traceback.format_exc())
+
+            # 只打印行号信息
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = exc_tb.tb_frame.f_code.co_filename
+            lineno = exc_tb.tb_lineno
+            self.GuiRefresh(self.ErrorText, f"出错位置: 文件 {fname}, 第 {lineno} 行")
+
             self.Process.setEnabled(True)
             try:
                 wb.save()
                 wb.close()
-            except Exception as e:
+            except Exception:
                 pass
 
     def _create_individual_charts(self, wb, sheetnames, charttitles, ringsindex, tempindex, infoindex,
@@ -1682,8 +1693,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         """
         # 获取当前系列数量，用于后续图例删除
         initial_series_count = chartApi.SeriesCollection().Count + 1
-        # initial_series_count += 0 if withSubaxis else 1
-        initial_series_count -= secondary_axis_series_count if secondary_axis_series_count <= 0 else 0
+        # initial_series_count -= secondary_axis_series_count if secondary_axis_series_count <= 0 else 0
+        initial_series_count -= secondary_axis_series_count
         # axis_index = 2 if secondary_axis_series_count > 0 else 1
         axis_index = 1
         target_axis = chartApi.Axes(2, axis_index)
