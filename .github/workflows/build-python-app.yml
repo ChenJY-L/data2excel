@@ -36,7 +36,7 @@ jobs:
     runs-on: windows-latest
     env:
       PYTHON_VERSION: '3.11'
-      MAIN_SCRIPT_PATH: 'data2excel.py'
+      MAIN_SCRIPT_PATH: 'src/data2excel.py'
       ICON_PATH: 'favicon01.ico'
       OUTPUT_DIR: 'dist' # 将输出目录名改为更通用的 'dist'
       EXE_NAME: 'data2excel'

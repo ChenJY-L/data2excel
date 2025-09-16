@@ -496,8 +496,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         """
         self.GuiRefresh(self.Status, 'Creating Output File')
         ProcessFilePath = os.path.join(Chpath.replace(Chpath.split('\\')[-1], ''),
-                                       Chpath.split('\\')[-2] + '.xlsm') if C else (
-                                       Chpath.split('Ch')[0] + 'Processed' + '.xlsm')
+                                       Chpath.split('\\')[-2] + '.xlsx') if C else (
+                                       Chpath.split('Ch')[0] + 'Processed' + '.xlsx')
 
         if os.path.isfile(ProcessFilePath) == False:
             wb = self.xwapp.books.add()  # 在app下创建一个Book
@@ -1684,7 +1684,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         initial_series_count = chartApi.SeriesCollection().Count + 1
         # initial_series_count += 0 if withSubaxis else 1
         initial_series_count -= secondary_axis_series_count if secondary_axis_series_count <= 0 else 0
-        axis_index = 2 if secondary_axis_series_count > 0 else 1
+        # axis_index = 2 if secondary_axis_series_count > 0 else 1
+        axis_index = 1
         target_axis = chartApi.Axes(2, axis_index)
 
         # 定义正则表达式，检测activity是否为纯数字
