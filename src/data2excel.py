@@ -77,6 +77,14 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
     # 阈值
     ERROR_THRESH = 5e-6
 
+    """
+    用于设置复制放大的chart的id和需要忽略的chart
+    """
+    Duplicate_Target = {
+        "index": [2, 5, 9],
+        "ignore_series": [[], [2,3,4], []]
+    }
+
     def __init__(self, parent=None):
         """
         初始化GUI界面
@@ -98,6 +106,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         self.waveDiffCheckBox.setChecked(True)
         self.expInfoCheckBox.setChecked(True)
         self.replace1314CheckBox.setChecked(True)
+        self.duplicateCheckBox.setChecked(True)
 
         # 连接信号和槽函数
         self.Process.clicked.connect(self.DataProcess)
@@ -1585,6 +1594,19 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 with_subaxis = False if temp_col <= 0 else True
                 self._add_experiment_annotations(chartApi, expInfo, timearr, p, secondary_axis_series_count)
 
+            # 图表复制并放大
+            if self.duplicateCheckBox.isChecked() and p in self.Duplicate_Target["index"]:
+                duplicate_index = self.Duplicate_Target["index"].index(p)
+                duplicated_chart = chartApi.Parent.Duplicate()
+                duplicated_chart.Top = 200 + self.CHART_TOP + self.CHART_HEIGHT*3 + duplicate_index*1.2*self.CHART_HEIGHT
+                duplicated_chart.Left = self.CHART_LEFT + self.CHART_WIDTH
+                duplicated_chart.Width = 2.5 * self.CHART_WIDTH
+                duplicated_chart.Height = 1.2 * self.CHART_HEIGHT
+
+                for ignore_index in self.Duplicate_Target["ignore_series"][duplicate_index]:
+                    duplicated_chart.Chart.FullSeriesCollection(ignore_index).IsFiltered = True
+
+            # 更新UI
             self.currenttime = datetime.datetime.now()
             self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
 
@@ -1818,6 +1840,12 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         titlebox.TextFrame2.TextRange.Characters.Font.Name = "Times New Roman"
         titlebox.TextFrame2.TextRange.Characters.Font.Size = self.MAIN_TITLE_FONT_SIZE
         titlebox.TextFrame2.TextRange.Characters.Font.Bold = 1
+
+        if self.duplicateCheckBox.isChecked():
+            duplicated_titlebox = titlebox.Duplicate()
+            duplicated_titlebox.Top = 200 + self.CHART_TOP + self.CHART_HEIGHT * 3 - 100
+            duplicated_titlebox.Left = self.CHART_LEFT + self.CHART_WIDTH
+            duplicated_titlebox.Width = 2.5 * self.CHART_WIDTH
 
     # ==================== 窗口事件处理 ====================
 
