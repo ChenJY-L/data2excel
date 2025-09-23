@@ -1,0 +1,48 @@
+name: Update Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  update-release:
+    name: Update release notes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes
+        id: release_notes
+        uses: actions/github-script@v7
+        with:
+          result-encoding: string
+          script: |
+            const commits = context.payload.commits || [];
+            if (commits.length === 0) {
+              return 'This push did not include any commits.';
+            }
+            const lines = commits.map((commit) => {
+              const message = commit.message.split('\n')[0];
+              const sha = commit.id.substring(0, 7);
+              return `- ${message} (${sha})`;
+            });
+            const compare = context.payload.compare;
+            if (compare) {
+              lines.push('', `Changes: ${compare}`);
+            }
+            return lines.join('\n');
+
+      - name: Create or update release
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          removeArtifacts: true
+          tag: latest
+          name: Latest Release
+          body: ${{ steps.release_notes.outputs.result }}
