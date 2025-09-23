@@ -508,9 +508,21 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                                        Chpath.split('\\')[-2] + '.xlsx') if C else (
                                        Chpath.split('Ch')[0] + 'Processed' + '.xlsx')
 
-        if os.path.isfile(ProcessFilePath) == False:
-            wb = self.xwapp.books.add()  # 在app下创建一个Book
-            wb.save(ProcessFilePath)
+        if os.path.isfile(ProcessFilePath):
+            self.GuiRefresh(self.Status, 'Removing Existing Output File')
+            try:
+                os.remove(ProcessFilePath)
+            except OSError as exc:
+                self.GuiRefresh(self.Status, 'Failed to Remove Existing File')
+                QMessageBox.critical(
+                    self,
+                    'File In Use',
+                    f'Unable to remove existing Excel file:\n{ProcessFilePath}\nPlease close the file and try again.\n\nDetails: {exc}'
+                )
+                raise
+
+        wb = self.xwapp.books.add()  # 在app下创建一个Book
+        wb.save(ProcessFilePath)
         wb = self.xwapp.books.open(ProcessFilePath)
 
         # 创建工作表
