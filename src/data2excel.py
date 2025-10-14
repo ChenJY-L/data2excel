@@ -1433,7 +1433,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 # 动态获取最后一列索引，并计算新的列名
                 last_col = sheet_target.used_range.last_cell.column
                 indices = [xw.utils.col_name(last_col + 2 + i) for i in range(len(targets))]
-                sheet_target.range(xw.utils.col_name(last_col + 1) + '1').value = wave1 + ' - ' + wave2
+                # sheet_target.range(xw.utils.col_name(last_col + 1) + '1').value = wave1 + ' - ' + wave2
+                sheet_target.range(xw.utils.col_name(last_col + 1) + '1').value = ' '   # 占位符，保证图例为 Diffxx XXXX - XXXX
 
                 # 在 Excel 中插入计算公式
                 for target, indice in zip(targets, indices):
@@ -1449,7 +1450,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
                     # 设置表头信息
                     sheet_target.range(f"{indice}1").value = None
-                    sheet_target.range(f"{indice}2").value = target
+                    sheet_target.range(f"{indice}2").value = target + ' ' + wave1 + ' - ' + wave2
 
                 PltRangeS += f", {indices[0]}1:{indices[-1]}{datasheet.used_range.last_cell.row}"
                 if not self.waveDiffCheckBox.isChecked():
@@ -1603,7 +1604,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
             # 添加实验信息标注
             if expInfo and (self.expInfoCheckBox.isChecked() or infoindex[p]):
-                with_subaxis = False if temp_col <= 0 else True
+                # with_subaxis = False if temp_col <= 0 else True
                 self._add_experiment_annotations(chartApi, expInfo, timearr, p, secondary_axis_series_count)
 
             # 图表复制并放大
