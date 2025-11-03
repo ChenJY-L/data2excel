@@ -103,6 +103,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
         # 设置默认选项
         # self.DyBCCheckBox.setChecked(True)
+        self.OGTTCheckBox.setChecked(True)
         self.waveDiffCheckBox.setChecked(True)
         self.expInfoCheckBox.setChecked(True)
         self.replace1314CheckBox.setChecked(True)
@@ -820,7 +821,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         wb.sheets[sheetnames[7]].range(3, rng_lcol + 1).value = timearr[int(len(timearr) / 2)]
         wb.sheets[sheetnames[7]].range(4, rng_lcol + 1).value = timearr[int(len(timearr) - 1)]
         wb.sheets[sheetnames[7]].range(2, rng_lcol + 2).value = 5.5
-        wb.sheets[sheetnames[7]].range(3, rng_lcol + 2).value = 10.5
+        wb.sheets[sheetnames[7]].range(3, rng_lcol + 2).value = 5.5
         wb.sheets[sheetnames[7]].range(4, rng_lcol + 2).value = 5.5
 
         # 设置时间格式
@@ -1193,9 +1194,9 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
         if self.OGTTCheckBox.isChecked():  # OGTT时的血糖值绘制准备
             # tempindex[5] = str(rng_lcol + 2)
-            tempindex[10] = str(rng_lcol + 2)
+            tempindex[9] = str(rng_lcol + 2)
             # charttitles[5] = '45环差分信号vs.血糖真值'
-            charttitles[10] = '1550nm单环吸光度vs.血糖真值'
+            charttitles[9] = '1550nm单环吸光度vs.血糖真值'
 
         if self.replace1314CheckBox.isChecked():
             charttitles[6] = '1050nm单环吸光度vs.1050nm差分吸光度&1550nm差分吸光度'
