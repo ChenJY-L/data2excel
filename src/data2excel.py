@@ -106,7 +106,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         self.OGTTCheckBox.setChecked(True)
         self.waveDiffCheckBox.setChecked(True)
         self.expInfoCheckBox.setChecked(True)
-        self.replace1314CheckBox.setChecked(True)
+        self.replace1314CheckBox.setChecked(False)
         self.duplicateCheckBox.setChecked(True)
 
         # 连接信号和槽函数
@@ -1172,7 +1172,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                        '1050nm单环吸光度', '1219nm单环吸光度',
                        '34环差分信号vs.加热功率', '45环差分信号vs.测头相对扶手高度(cm)',
                        '1314nm单环吸光度', '1409nm单环吸光度',
-                       '1050nm差分吸光度vs.测头下实际温度', '1550nm差分吸光度 - 1050nm差分吸光度',
+                       '1050nm差分吸光度vs.测头下实际温度', 'Diff1550-Diff1050',
                        '1550nm单环吸光度', '1609nm单环吸光度']
 
         ringsindex = ['Diff12', 'Diff23', '1050', '1219',
@@ -1196,7 +1196,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             # tempindex[5] = str(rng_lcol + 2)
             tempindex[9] = str(rng_lcol + 2)
             # charttitles[5] = '45环差分信号vs.血糖真值'
-            charttitles[9] = '1550nm单环吸光度vs.血糖真值'
+            charttitles[9] = charttitles[9] + 'vs.血糖值'
 
         if self.replace1314CheckBox.isChecked():
             charttitles[6] = '1050nm单环吸光度vs.1050nm差分吸光度&1550nm差分吸光度'
@@ -1444,14 +1444,14 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                         base_addr + waveIndex2)
 
                     # 绝对引用公式
-                    formula = f"=${addr1}2 - ${addr2}2"
+                    formula = f"=${addr1}2-${addr2}2"
 
                     # 填充整个列（从 2 到最后一行）
                     sheet_target.range(f"{indice}2:{indice}{datasheet.used_range.last_cell.row}").formula = formula
 
                     # 设置表头信息
                     sheet_target.range(f"{indice}1").value = None
-                    sheet_target.range(f"{indice}2").value = target + ' ' + wave1 + ' - ' + wave2
+                    sheet_target.range(f"{indice}2").value = target + ' ' + wave1 + '-' + wave2
 
                 PltRangeS += f", {indices[0]}1:{indices[-1]}{datasheet.used_range.last_cell.row}"
                 if not self.waveDiffCheckBox.isChecked():
@@ -1527,8 +1527,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
             if self.waveDiffCheckBox.isChecked() and len(each) == 17:
                 # 放到1219单环的位置上
-                figure_lft = self.CHART_LEFT + self.CHART_WIDTH * 3
-                figure_top = self.CHART_TOP
+                figure_lft = self.CHART_LEFT
+                figure_top = self.CHART_TOP + self.CHART_HEIGHT * 2
 
             # 创建图表
             chart = wb.sheets[sheetnames[4]].charts.add(
@@ -1827,8 +1827,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             self.GuiRefresh(self.Status, 'Adding remarks')
             textbox = wb.sheets[sheetnames[4]].shapes.api.AddTextbox(
                 Orientation=1,  # 水平方向
-                Left=self.CHART_LEFT,
-                Top=self.CHART_TOP + self.CHART_HEIGHT * 2,
+                Left=self.CHART_LEFT + self.CHART_WIDTH * 2,
+                Top=self.CHART_TOP + self.CHART_HEIGHT * 1,
                 Width=self.CHART_WIDTH / 2,
                 Height=self.CHART_HEIGHT,
             )
