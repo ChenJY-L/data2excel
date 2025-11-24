@@ -652,6 +652,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
                 # 利用时间戳数值远远大于数据的特点，判断时间的索引，提取时间索引前的全部数据
                 raw_data = Chvalues[r][j]
+                if np.isnan(raw_data).all():
+                    raw_data = np.ones(np.size(raw_data))
                 time_index = np.nanargmax(raw_data)
                 singles = raw_data[:time_index]
                 single = np.mean(singles)
@@ -719,6 +721,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                     # diffs = np.log(Chvalues[r][j][1:m - 1] / Chvalues[rl][j][1:m - 1])
                     # diff = sum(diffs) / (m - 2)
                     raw_data = Chvalues[r][j]
+                    if np.isnan(raw_data).all():
+                        raw_data = np.ones(np.size(raw_data))
                     time_index = np.nanargmax(raw_data)
 
                     diffs = np.log(Chvalues[r][j][:time_index] / Chvalues[rl][j][:time_index])
