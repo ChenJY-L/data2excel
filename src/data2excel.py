@@ -1546,6 +1546,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             # 设置图表基本属性
             chart.chart_type = 'xy_scatter_lines'
             chart.set_source_data(pltrange)
+            chart.api[0].Placement = xw.constants.Placement.xlFreeFloating
             chartApi = chart.api[1]
             chartApi.Legend.Position = -4107  # xlLegendPositionBottom
 
@@ -1604,8 +1605,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 series.MarkerStyle = 8  # 圆形标记
                 series.MarkerSize = 5
 
-            self._configure_chart_appearance(chartApi, charttitles[p], ytitle, temp_col,
-                                           wb, sheetnames, rng_lcol)
+            self._configure_chart_appearance(chartApi, charttitles[p], ytitle, temp_col,wb, sheetnames, rng_lcol)
 
             # 添加实验信息标注
             if expInfo and (self.expInfoCheckBox.isChecked() or infoindex[p]):
@@ -1843,6 +1843,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             textbox.TextFrame2.TextRange.Characters.Font.Name = "Times New Roman"
             textbox.TextFrame2.TextRange.Characters.Font.Size = self.ANNOTATION_FONT_SIZE
             textbox.TextFrame2.TextRange.Characters.Font.Bold = 1
+            textbox.Placement = xw.constants.Placement.xlFreeFloating
 
         # 添加标题文本框
         titlebox = wb.sheets[sheetnames[4]].shapes.api.AddTextbox(
@@ -1858,6 +1859,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         titlebox.TextFrame2.TextRange.Characters.Font.Name = "Times New Roman"
         titlebox.TextFrame2.TextRange.Characters.Font.Size = self.MAIN_TITLE_FONT_SIZE
         titlebox.TextFrame2.TextRange.Characters.Font.Bold = 1
+        titlebox.Placement = xw.constants.Placement.xlFreeFloating
 
         if self.duplicateCheckBox.isChecked():
             duplicated_titlebox = titlebox.Duplicate()
