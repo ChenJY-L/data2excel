@@ -34,8 +34,6 @@ import gui as QTUI  # GUI界面模块
 import ico01
 import ctypes
 
-
-
 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("myappid")
 
 
@@ -1179,7 +1177,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                        '1050nm单环吸光度vs.侧头下实际温度', '1219nm单环吸光度',
                        '34环差分信号vs.加热功率', '45环差分信号vs.测头相对扶手高度(cm)',
                        '1314nm单环吸光度', '1409nm单环吸光度',
-                       'Diff1550-Diff1050', '1050nm差分吸光度vs.测头下实际温度',
+                       '1050nm差分吸光度vs.测头下实际温度', 'Diff1550-Diff1050',
                        '1550nm单环吸光度', '1609nm单环吸光度']
 
         ringsindex = ['Diff12', 'Diff23', '1050', '1219',
@@ -1201,14 +1199,14 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
         if self.OGTTCheckBox.isChecked():  # OGTT时的血糖值绘制准备
             # tempindex[5] = str(rng_lcol + 2)
-            tempindex[8] = str(rng_lcol + 2)
+            tempindex[9] = str(rng_lcol + 2)
             # charttitles[5] = '45环差分信号vs.血糖真值'
-            charttitles[8] = charttitles[8] + ' vs.血糖值'
+            charttitles[9] = charttitles[9] + ' vs.血糖值'
 
-        if self.tempCorrelationCheckBox.isChecked():
-            charttitles[11] = '温度矫正后的波长差分'
-            ringsindex[11] = 'Diff1550-Diff1050-temp'
-            tempindex[11] = '0'
+        if self.replace1314CheckBox.isChecked():
+            charttitles[6] = '1050nm单环吸光度vs.1050nm差分吸光度&1550nm差分吸光度'
+            ringsindex[6] = '1050-5'
+            tempindex[6] = ['Diff45 1050', 'Diff45 1550']
 
         pltN = len(charttitles)
         SRRange = 'A1:ZZ2'
@@ -1429,7 +1427,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                     addrstr = xw.utils.col_name(int(addr) + waveIndex) + ':' + xw.utils.col_name(int(addr) + waveIndex)
                     PltRangeS = PltRangeS + ', ' + addrstr
 
-            elif len(each) >= 17:  # 差分计算，如'Diff1550-Diff1050'
+            elif len(each) == 17:  # 差分计算，如'Diff1550-Diff1050'
                 datasheet = diffSheet
                 ytitle = 'ΔAd'
                 wave1, wave2 = each[4:8], each[13:17]
@@ -1457,8 +1455,13 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                         设置温度矫正后的波长差分公式，并将1050温度矫正系数和使用的温度列写入文件中
                         公式: $ y = Diff1550 - (Diff1050 - \phi*T) $
                         """
+                        base_cycle = int(self.BaseCycle.value()) + 1
                         temp_corr_addr = xw.utils.col_name(last_col + 6) # 设置矫正配置项所在列
                         temp_addr = f'INDEX(温度数据!$L:$Q,ROW()-1,MATCH(${temp_corr_addr}$4,温度数据!$L$1:$Q$1,0))' # 列匹配公式
+                        base_temp_addr = (
+                            f'INDEX(温度数据!$L:$Q,{base_cycle},'
+                            f'MATCH(${temp_corr_addr}$4,温度数据!$L$1:$Q$1,0))'
+                        )
 
                         # 填充配置
                         sheet_target.range(xw.utils.col_name(last_col + 1) + '1').value = '温度矫正'
@@ -1468,7 +1471,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                         sheet_target.range(temp_corr_addr + '4').value = 'TC1实际温度'
 
                         # 组合公式
-                        formula = f"=${addr1}2-${addr2}2-${temp_corr_addr}$2*{temp_addr}"
+                        formula = f"=${addr1}2-${addr2}2+${temp_corr_addr}$2*({temp_addr}-{base_temp_addr})"
 
                     # 填充整个列（从 2 到最后一行）
                     sheet_target.range(f"{indice}2:{indice}{datasheet.used_range.last_cell.row}").formula = formula
@@ -1546,11 +1549,11 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             #     figure_top = self.CHART_TOP + self.CHART_HEIGHT * int(p / 4)
             #     figure_height = self.CHART_HEIGHT
 
-            figure_lft = (self.CHART_LEFT + self.CHART_WIDTH * int(p % 4))
-            figure_top = (self.CHART_TOP + self.CHART_HEIGHT * int(p / 4))
+            figure_lft = (self.CHART_LEFT + self.CHART_WIDTH * int(p % 4)) if len(each) < 8 else self.CHART_LEFT + self.CHART_WIDTH
+            figure_top = (self.CHART_TOP + self.CHART_HEIGHT * int(p / 4)) if len(each) <= 8 else (self.CHART_TOP + self.CHART_HEIGHT * int(p / 4)) + self.CHART_HEIGHT / 2
 
             if self.waveDiffCheckBox.isChecked() and len(each) == 17:
-                # 特殊处理Diff1550-Diff1050的位置
+                # 放到1219单环的位置上
                 figure_lft = self.CHART_LEFT
                 figure_top = self.CHART_TOP + self.CHART_HEIGHT * 2
 
