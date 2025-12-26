@@ -1648,6 +1648,12 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 for ignore_index in self.Duplicate_Target["ignore_series"][duplicate_index]:
                     duplicated_chart.Chart.FullSeriesCollection(ignore_index).IsFiltered = True
 
+                self.AXIS_FONT_SIZE += 6
+                self.AXIS_TITLE_FONT_SIZE += 6
+                self._configure_chart_appearance(duplicated_chart.Chart, charttitles[p], ytitle, temp_col, wb, sheetnames, rng_lcol)
+                self.AXIS_FONT_SIZE -= 6
+                self.AXIS_TITLE_FONT_SIZE -= 6
+
             # 更新UI
             self.currenttime = datetime.datetime.now()
             self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
@@ -1660,8 +1666,16 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         self.GuiRefresh(self.Status, 'Saving...')
         wb.save()
 
-    def _configure_chart_appearance(self, chartApi, chart_title, ytitle, temp_index,
-                                   wb, sheetnames, rng_lcol):
+    def _configure_chart_appearance(self,
+                                    chartApi,
+                                    chart_title,
+                                    ytitle,
+                                    temp_index,
+                                    wb,
+                                    sheetnames,
+                                    rng_lcol,
+                                    title_font_size=18,
+                                    ):
         """
         配置图表外观样式
 
