@@ -582,6 +582,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             yinterp = np.empty((timearr.shape[0], 1))
 
         if self.TempCheckBox.isChecked():
+            Tempvalue = np.asarray(Tempvalue, dtype=float) # fix data type
             wb.sheets[sheetnames[len(sheetnames) - 1]].range(2, 1).value = timearr
             wb.sheets[sheetnames[len(sheetnames) - 1]].range(2, 2).value = cycleNoarr
             wb.sheets[sheetnames[len(sheetnames) - 1]].range(1, 2).value = Temptitle
@@ -1174,7 +1175,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
         # 图表配置信息
         charttitles = ['12环差分信号vs.室温', '23环差分信号vs.测头旁皮肤温度',
-                       '1050nm单环吸光度vs.侧头下实际温度', '1219nm单环吸光度',
+                       '1050nm单环吸光度vs.测头下实际温度', '1219nm单环吸光度',
                        '34环差分信号vs.加热功率', '45环差分信号vs.测头相对扶手高度(cm)',
                        '1314nm单环吸光度', '1409nm单环吸光度',
                        'Diff1550-Diff1050', '1050nm差分吸光度vs.测头下实际温度',
@@ -1186,11 +1187,11 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
         if self.TempCheckBox.isChecked():
             tempindex = ['4', '5', '12', '0',
-                         '15', '31', '0', '0',
+                         '15', '0', '0', '0',
                          '0', '12', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
         else:
             tempindex = ['0', '0', '0', '0',
-                         '0', '3', '0', '0',
+                         '0', '0', '0', '0',
                          '0', '0', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
 
         infoindex = [False, False, False, False,
@@ -1204,7 +1205,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             charttitles[8] = charttitles[8] + ' vs.血糖值'
 
         if self.tempCorrelationCheckBox.isChecked():
-            charttitles[11] = '温度矫正后的波长差分'
+            charttitles[11] = '温度校正后的波长差分'
             ringsindex[11] = 'Diff1550-Diff1050-temp'
             tempindex[11] = '0'
 
