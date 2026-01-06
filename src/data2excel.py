@@ -520,33 +520,99 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             self.isInfo = False
             return None
 
+    def get_baseline_for_cycle(self, cycle_index, timearr, expInfo):
+        """
+        根据周期索引获取对应的基准周期索引
+
+        Args:
+            cycle_index: 当前周期索引（0-based）
+            timearr: 时间数组
+            expInfo: 实验信息（包含 baseline_cycle 配置）
+
+        Returns:
+            int: 基准周期索引（1-based，与GUI中BaseCycle一致）
+        """
+        # 如果没有 expInfo 或没有 baseline_cycle 配置，使用默认的 BaseCycle
+        if expInfo is None or expInfo.get('baseline_cycle') is None:
+            return self.BaseCycle.value()
+
+        baseline_cycles = expInfo['baseline_cycle']
+        if not baseline_cycles:
+            return self.BaseCycle.value()
+
+        # 获取当前周期对应的时间
+        current_time = timearr[cycle_index] if cycle_index < len(timearr) else timearr[-1]
+        # 将时间转换为当天的小时数部分（仅保留小数部分）
+        time_of_day = float(current_time) % 1.0
+
+        # 遍历 baseline_cycle 配置，查找匹配的时间范围
+        for item in baseline_cycles:
+            time_range = item.get('time')
+            value = item.get('value')
+
+            if time_range is None or value is None:
+                continue
+
+            # 处理时间范围
+            if isinstance(time_range, tuple) and len(time_range) == 2:
+                start_time, end_time = time_range
+                if start_time <= time_of_day < end_time:
+                    return int(value)
+            elif isinstance(time_range, (int, float)):
+                # 单个时间点：该时间之后使用此基准周期
+                if time_of_day >= time_range:
+                    return int(value)
+
+        # 如果没有匹配的配置，返回默认值
+        return self.BaseCycle.value()
+
     def calculate_base_data(self, Chvalues, Ch, wn, m, expInfo=None):
         """
         计算基准周期的单环和差分数据
+        支持多基准周期：预计算所有可能的基准周期数据
 
         Args:
             Chvalues: 各环数据数组
             Ch: 环数
             wn: 波长数量
             m: 每次测量数加一
+            expInfo: 实验信息（包含 baseline_cycle 配置）
 
         Returns:
-            tuple: (basesingle, basediff) 基准单环数据和基准差分数据
+            tuple: (basesingle_dict, basediff_dict) 基准数据字典，键为基准周期索引
         """
         self.GuiRefresh(self.Status, 'Calculating Base Data')
-        basesingle = np.zeros((Ch, wn))  # 波长列数，环数行数
+
+        # 收集所有需要计算的基准周期索引
+        base_cycles = {self.BaseCycle.value()}  # 默认基准周期
+
+        if expInfo is not None and expInfo.get('baseline_cycle'):
+            for item in expInfo['baseline_cycle']:
+                value = item.get('value')
+                if value is not None:
+                    base_cycles.add(int(value))
+
+        # 为每个基准周期计算基准数据
+        basesingle_dict = {}
+        basediff_dict = {}
         diffNo = int(Ch * (Ch - 1) // 2)
-        basediff = np.zeros((diffNo, wn))
 
-        for w in range(0, wn):
-            cs = -1
-            for r in range(0, Ch):
-                basesingle[r][w] = sum(Chvalues[r][(self.BaseCycle.value() - 1) * 6 + w][:m - 1]) / (m - 1)
-                for rl in range(r + 1, Ch):
-                    cs = cs + 1
-                    basediff[cs][w] = sum(np.log(Chvalues[r][(self.BaseCycle.value() - 1) * 6 + w][:m - 1] / Chvalues[rl][(self.BaseCycle.value() - 1) * 6 + w][:m - 1])) / (m - 1)
+        for base_cycle in base_cycles:
+            basesingle = np.zeros((Ch, wn))
+            basediff = np.zeros((diffNo, wn))
 
-        return basesingle, basediff
+            for w in range(0, wn):
+                cs = -1
+                for r in range(0, Ch):
+                    basesingle[r][w] = sum(Chvalues[r][(base_cycle - 1) * 6 + w][:m - 1]) / (m - 1)
+                    for rl in range(r + 1, Ch):
+                        cs = cs + 1
+                        basediff[cs][w] = sum(np.log(Chvalues[r][(base_cycle - 1) * 6 + w][:m - 1] / Chvalues[rl][(base_cycle - 1) * 6 + w][:m - 1])) / (m - 1)
+
+            basesingle_dict[base_cycle] = basesingle
+            basediff_dict[base_cycle] = basediff
+
+        return basesingle_dict, basediff_dict
 
     def create_excel_workbook(self, Chpath, C):
         """
@@ -675,9 +741,10 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         wb.sheets[sheetnames[6]].range(5 + Ch, 14).options(transpose=True).value = diffwords
         wb.save()
 
-    def process_single_ring_data(self, wb, sheetnames, Chvalues, Ch, ringwords, wave, datarange, basesingle, n, wn, m):
+    def process_single_ring_data(self, wb, sheetnames, Chvalues, Ch, ringwords, wave, datarange, basesingle_dict, n, wn, m, timearr=None, expInfo=None):
         """
         处理单环数据并写入Excel
+        支持多基准周期数据处理
 
         Args:
             wb: Excel工作簿对象
@@ -687,10 +754,12 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             ringwords: 环标签列表
             wave: 波长列表
             datarange: 数据范围
-            basesingle: 基准单环数据
+            basesingle_dict: 基准单环数据字典，键为基准周期索引
             n: 数据行数
             wn: 波长数量
             m: 每次测量数加一
+            timearr: 时间数组（用于多基准周期判断）
+            expInfo: 实验信息（用于多基准周期判断）
         """
         for r in range(0, Ch):
             # 写入数据头
@@ -713,6 +782,11 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 time_index = np.nanargmax(raw_data)
                 singles = raw_data[:time_index]
                 single = np.mean(singles)
+
+                # 获取当前周期对应的基准周期
+                cycle_index = j // wn
+                base_cycle = self.get_baseline_for_cycle(cycle_index, timearr, expInfo)
+                basesingle = basesingle_dict[base_cycle]
 
                 singleabs = np.log(basesingle[r][j % wn] / single)
                 singlesnr = single / np.std(singles, ddof=1)
@@ -739,9 +813,10 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         wb.save()
         self.GuiRefresh(self.Status, 'Writing Single Finished')
 
-    def process_differential_data(self, wb, sheetnames, Chvalues, Ch, diffwords, wave, datarange, basediff, n, wn, m):
+    def process_differential_data(self, wb, sheetnames, Chvalues, Ch, diffwords, wave, datarange, basediff_dict, n, wn, m, timearr=None, expInfo=None):
         """
         处理差分数据并写入Excel
+        支持多基准周期数据处理
 
         Args:
             wb: Excel工作簿对象
@@ -751,10 +826,12 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             diffwords: 差分标签列表
             wave: 波长列表
             datarange: 数据范围
-            basediff: 基准差分数据
+            basediff_dict: 基准差分数据字典，键为基准周期索引
             n: 数据行数
             wn: 波长数量
             m: 每次测量数加一
+            timearr: 时间数组（用于多基准周期判断）
+            expInfo: 实验信息（用于多基准周期判断）
         """
         cs = -1
         for r in range(0, Ch):
@@ -783,6 +860,11 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
                     diffs = np.log(Chvalues[r][j][:time_index] / Chvalues[rl][j][:time_index])
                     diff = np.mean(diffs)
+
+                    # 获取当前周期对应的基准周期
+                    cycle_index = j // wn
+                    base_cycle = self.get_baseline_for_cycle(cycle_index, timearr, expInfo)
+                    basediff = basediff_dict[base_cycle]
 
                     diffabs = diff - basediff[cs][j % wn]
                     diffsnr = 1 / np.std(diffs, ddof=1)
@@ -1377,8 +1459,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 timearr[l] = timeele
                 cycleNoarr[l] = l + 1
 
-            # 5. 计算基准周期数据
-            basesingle, basediff = self.calculate_base_data(Chvalues, Ch, wn, m)
+            # 5. 计算基准周期数据（支持多基准周期）
+            basesingle_dict, basediff_dict = self.calculate_base_data(Chvalues, Ch, wn, m, expInfo)
 
             # 6. 创建Excel工作簿和工作表
             wb, sheetnames = self.create_excel_workbook(Chpath, C)
@@ -1398,11 +1480,11 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             # 9. 写入汇总数据标题
             self.write_summary_data(wb, sheetnames, wave, ringwords, diffwords, Ch, C)
 
-            # 10. 处理单环数据
-            self.process_single_ring_data(wb, sheetnames, Chvalues, Ch, ringwords, wave, datarange, basesingle, n, wn, m)
+            # 10. 处理单环数据（支持多基准周期）
+            self.process_single_ring_data(wb, sheetnames, Chvalues, Ch, ringwords, wave, datarange, basesingle_dict, n, wn, m, timearr, expInfo)
 
-            # 11. 处理差分数据
-            self.process_differential_data(wb, sheetnames, Chvalues, Ch, diffwords, wave, datarange, basediff, n, wn, m)
+            # 11. 处理差分数据（支持多基准周期）
+            self.process_differential_data(wb, sheetnames, Chvalues, Ch, diffwords, wave, datarange, basediff_dict, n, wn, m, timearr, expInfo)
 
             # 12. 处理动态基准周期
             self.handle_dynamic_base_cycle(wb, sheetnames, Ch, n, wn, C)
@@ -1542,7 +1624,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                         formula = f"=${addr1}2-${addr2}2"
                     elif len(each) == 22:
                         """
-                        设置温度矫正后的波长差分公式，并将1050温度矫正系数和使用的温度列写入文件中
+                        设置温度校正后的波长差分公式，并将1050温度校正系数和使用的温度列写入文件中
                         公式: $ y = Diff1550 - (Diff1050 - \phi*T) $
                         """
                         base_cycle = int(self.BaseCycle.value()) + 1
@@ -1554,8 +1636,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                         )
 
                         # 填充配置
-                        sheet_target.range(xw.utils.col_name(last_col + 1) + '1').value = '温度矫正'
-                        sheet_target.range(temp_corr_addr + '1').value = 'Diff1050温度矫正系数👇'
+                        sheet_target.range(xw.utils.col_name(last_col + 1) + '1').value = '温度校正'
+                        sheet_target.range(temp_corr_addr + '1').value = 'Diff1050温度校正系数👇'
                         sheet_target.range(temp_corr_addr + '2').value = self.TempCorr1050
                         sheet_target.range(temp_corr_addr + '3').value = '温度列👇'
                         sheet_target.range(temp_corr_addr + '4').value = 'TC1实际温度'
