@@ -278,6 +278,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 continue
 
             if current_section == "remark":
+
                 remark.append(line)
                 continue
 
@@ -1422,8 +1423,11 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 datasheet = diffSheet
                 waveIndex = wave.index(each[-4:]) + 1
                 ytitle = 'ΔAd'
-                for i in range(1, Ch):
-                    target = 'Diff' + str(i) + str(i + 1)
+                pairs = [(i, i + 1) for i in range(1, Ch)]  # 相邻：12,23,34...
+                pairs.append((3, 5))  # 添加35环
+
+                for a, b in pairs:
+                    target = f'Diff{a}{b}'
                     addr = self.FindRowColRange(datasheet, 'Col', target, SRRange)
                     addrstr = xw.utils.col_name(int(addr) + waveIndex) + ':' + xw.utils.col_name(int(addr) + waveIndex)
                     PltRangeS = PltRangeS + ', ' + addrstr
@@ -1434,7 +1438,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 wave1, wave2 = each[4:8], each[13:17]
                 waveIndex1, waveIndex2 = wave.index(wave1) + 1, wave.index(wave2) + 1
 
-                targets = ['Diff12', 'Diff23', 'Diff34', 'Diff45']
+                targets = ['Diff12', 'Diff23', 'Diff34', 'Diff35', 'Diff45']
                 sheet_target = wb.sheets[sheetnames[4]]
 
                 # 动态获取最后一列索引，并计算新的列名
@@ -1457,7 +1461,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                         公式: $ y = Diff1550 - (Diff1050 - \phi*T) $
                         """
                         base_cycle = int(self.BaseCycle.value()) + 1
-                        temp_corr_addr = xw.utils.col_name(last_col + 6) # 设置矫正配置项所在列
+                        temp_corr_addr = xw.utils.col_name(last_col + len(targets) + 2) # 设置矫正配置项所在列
                         temp_addr = f'INDEX(温度数据!$L:$Q,ROW()-1,MATCH(${temp_corr_addr}$4,温度数据!$L$1:$Q$1,0))' # 列匹配公式
                         base_temp_addr = (
                             f'INDEX(温度数据!$L:$Q,{base_cycle},'
