@@ -248,74 +248,127 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         return Cell_Result
 
     def parseText(self, text):
-        """
-        解析实验标注文本，提取时间和活动信息
+        TIME_RE = re.compile(r'^\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*$')
+        RANGE_RE = re.compile(r'^\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*-\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*$')
 
-        解析规则：
-        1. 如果一行开头是中文，则第一个冒号前是活动，冒号后是时间
-        2. 如果一行开头是数字，则最后一个冒号前是时间，冒号后是活动
-        3. 时间段和时间点都会被转换为Excel时间格式（小数形式）
-        4. 当遇到"备注"开头的行时，后续所有内容都作为备注信息
+        def excel_time(h, m, s=0):
+            h, m, s = int(h), int(m), int(s or 0)
+            if not (0 <= h < 24 and 0 <= m < 60 and 0 <= s < 60):
+                raise ValueError
+            return (h * 3600 + m * 60 + s) / 86400
 
-        Args:
-            text: 要解析的文本内容
+        def parse_time(s):
+            m = RANGE_RE.match(s)
+            if m:
+                return (excel_time(m.group(1), m.group(2), m.group(3)),
+                        excel_time(m.group(4), m.group(5), m.group(6)))
+            m = TIME_RE.match(s)
+            if m:
+                return excel_time(m.group(1), m.group(2), m.group(3))
+            raise ValueError
 
-        Returns:
-            dict: 包含'schedule'(时间安排列表)和'remark'(备注信息)的字典
-        """
-        schedule = []
-        remark = []
-        current_section = "schedule"  # 初始状态
+        def to_num(s):
+            s = s.strip()
+            try:
+                return int(s) if re.fullmatch(r'[+-]?\d+', s) else float(s)
+            except Exception:
+                return s
 
-        for line in text.strip().splitlines():
-            line = line.strip().replace('：', ':')  # 统一冒号
+        def header_kind(line):
+            # 兼容：血糖: / 基准周期: / [血糖] / [基准周期]
+            t = line.strip()
+            if t.startswith('[') and t.endswith(']'):
+                t = t[1:-1].strip()
+            if t.endswith(':'):
+                t = t[:-1].strip()
+            if t == '血糖':
+                return 'blood_glucose'
+            if t == '基准周期':
+                return 'baseline_cycle'
+            return None
+
+        def looks_structured(line):
+            # 用于结束备注块：冒号左右任一侧像时间/时间段，就认为是结构化
+            if ':' not in line:
+                return False
+            a, b = line.split(':', 1)
+            a, b = a.strip(), b.strip()
+            return any([TIME_RE.match(a), RANGE_RE.match(a), TIME_RE.match(b), RANGE_RE.match(b)])
+
+        schedule, blood_glucose, baseline_cycle, remark = [], [], [], []
+        mode = None  # None / 'blood_glucose' / 'baseline_cycle'
+
+        lines = text.splitlines()
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip().replace('：', ':')
+            i += 1
             if not line or line.startswith('#'):
                 continue
 
-            if line.startswith("备注"):
-                current_section = "remark"
-                remark.append(line[3:].strip())  # 直接添加，无需额外判断
+            # --- 备注：行内 or 备注块 ---
+            if line.startswith('备注'):
+                tail = line[2:].lstrip(':').strip()
+                if tail:
+                    remark.append(tail)
+                    continue
+
+                # 备注块：收集后续非结构化行；遇到段头/结构化行就停止（不吞掉那行）
+                while i < len(lines):
+                    s = lines[i].strip().replace('：', ':')
+                    if not s or s.startswith('#'):
+                        i += 1
+                        continue
+                    if header_kind(s) or looks_structured(s):
+                        break
+                    remark.append(s)
+                    i += 1
                 continue
 
-            if current_section == "remark":
-
-                remark.append(line)
+            # --- 段头 ---
+            k = header_kind(line)
+            if k:
+                mode = k
                 continue
 
-            # 定位冒号
-            split_pos = line.rfind(':') if re.match(r'^\d', line) else line.find(':')
+            # --- 段内：时间(段): 值 ---
+            if mode in ('blood_glucose', 'baseline_cycle'):
+                if ':' not in line:
+                    (blood_glucose if mode == 'blood_glucose' else baseline_cycle).append(
+                        {"time": None, "value": line}
+                    )
+                    continue
 
-            if split_pos != -1:
-                if re.match(r'^\d', line):
-                    time_str, activity = line[:split_pos].strip(), line[split_pos + 1:].strip()
-                else:
-                    activity, time_str = line[:split_pos].strip(), line[split_pos + 1:].strip()
-                # 处理时间段（例如 "17:20-17:23"）
-                if '-' in time_str:
-                    try:
-                        start_time, end_time = time_str.split('-')
-                        start_datetime = parser.parse(start_time.strip())
-                        end_datetime = parser.parse(end_time.strip())
+                left, right = line.rsplit(':', 1)
+                try:
+                    t = parse_time(left.strip())
+                except Exception:
+                    t = None
+                (blood_glucose if mode == 'blood_glucose' else baseline_cycle).append(
+                    {"time": t, "value": to_num(right)}
+                )
+                continue
 
-                        # 将 datetime 转为 Excel 时间
-                        start_excel_time = (start_datetime.hour * 3600 + start_datetime.minute * 60 + start_datetime.second) / 86400
-                        end_excel_time = (end_datetime.hour * 3600 + end_datetime.minute * 60 + end_datetime.second) / 86400
+            # --- 其他：走 schedule 规则 ---
+            if ':' not in line:
+                schedule.append({"time": None, "activity": line})
+                continue
 
-                        schedule.append({"time": (start_excel_time, end_excel_time), "activity": activity})
-                    except ValueError:
-                        schedule.append({"time": None, "activity": line})
-                else:  # 单个时间
-                    try:
-                        t = parser.parse(time_str)
-                        excel_time = (t.hour * 3600 + t.minute * 60 + t.second) / 86400
-                        schedule.append({"time": excel_time, "activity": activity})
-                    except ValueError:
-                        schedule.append({"time": None, "activity": line})
-            else:  # schedule 部分没找到冒号，整行都是活动
+            if re.match(r'^\d', line):  # 数字开头：时间: 活动
+                time_str, activity = line.rsplit(':', 1)
+            else:  # 非数字开头：活动: 时间
+                activity, time_str = line.split(':', 1)
+
+            try:
+                t = parse_time(time_str.strip())
+                schedule.append({"time": t, "activity": activity.strip()})
+            except Exception:
                 schedule.append({"time": None, "activity": line})
 
         return {
             "schedule": schedule,
+            "baseline_cycle": baseline_cycle or None,
+            "blood_glucose": blood_glucose or None,
             "remark": "\n".join(remark).strip() if remark else None
         }
 
@@ -467,7 +520,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             self.isInfo = False
             return None
 
-    def calculate_base_data(self, Chvalues, Ch, wn, m):
+    def calculate_base_data(self, Chvalues, Ch, wn, m, expInfo=None):
         """
         计算基准周期的单环和差分数据
 
@@ -797,7 +850,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             self.GuiRefresh(self.Status, 'Saving...')
             wb.save()
 
-    def add_glucose_data(self, wb, sheetnames, timearr, yinterp, C):
+    def add_glucose_data(self, wb, sheetnames, timearr, yinterp, C, expInfo=None):
         """
         添加血糖数据到Excel
 
@@ -807,14 +860,11 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             timearr: 时间数组
             yinterp: 插值后的温度数据
             C: 是否为中文文件名
+            expInfo: 实验信息（包含 parseText 解析出的 blood_glucose）
 
         Returns:
             int: 血糖数据列的索引
         """
-
-        # 如果明确是LD数据则不添加血糖值
-        if self.LDCheckBox.isChecked():
-            return
 
         try:
             rng_lcol = len(yinterp[1]) + 3
@@ -822,18 +872,53 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             print("No temperature data")
             rng_lcol = 2
 
-        # 添加血糖数据
-        wb.sheets[sheetnames[7]].range(1, rng_lcol + 2).value = '血糖值' if C else 'Glucose Value'
-        wb.sheets[sheetnames[7]].range(2, rng_lcol + 1).value = timearr[0]
-        wb.sheets[sheetnames[7]].range(3, rng_lcol + 1).value = timearr[int(len(timearr) / 2)]
-        wb.sheets[sheetnames[7]].range(4, rng_lcol + 1).value = timearr[int(len(timearr) - 1)]
-        wb.sheets[sheetnames[7]].range(2, rng_lcol + 2).value = 5.5
-        wb.sheets[sheetnames[7]].range(3, rng_lcol + 2).value = 5.5
-        wb.sheets[sheetnames[7]].range(4, rng_lcol + 2).value = 5.5
+        # 如果明确是LD数据则不添加血糖值，但仍返回列索引用于后续图表逻辑
+        if self.LDCheckBox.isChecked():
+            return rng_lcol
+
+        try:
+            temp_sheet = wb.sheets[sheetnames[7]]
+        except Exception:
+            return rng_lcol
+
+
+        time_flat = np.asarray(timearr, dtype=float).reshape(-1)
+        base_day = float(np.floor(time_flat[0])) if len(time_flat) else 0.0
+        bg_list = (expInfo or {}).get("blood_glucose") if isinstance(expInfo, dict) else None
+
+        records = []
+        if isinstance(bg_list, list):
+            for item in bg_list:
+                if not isinstance(item, dict):
+                    continue
+                value = float(item.get("value"))
+                if value is None:
+                    continue
+
+                t = item.get("time")
+                if t is None:
+                    records.append((None, value))
+                else:
+                    target = float(t)
+                    if target is not None:
+                        records.append((target + base_day, value))
+
+        # 兼容旧行为：没有提供血糖数据时，默认在首/中/末三个点放置5.5
+        if not records and len(time_flat) >= 1:
+            records = [
+                (float(time_flat[0]), 5.5),
+                (float(time_flat[len(time_flat) // 2]), 5.5),
+                (float(time_flat[-1]), 5.5),
+            ]
 
         # 设置时间格式
         gcols = xw.utils.col_name(rng_lcol + 1) + ':' + xw.utils.col_name(rng_lcol + 1)
-        wb.sheets[sheetnames[7]].api.Columns(gcols).NumberFormatLocal = "[$-x-systime]h:mm:ss AM/PM"
+        temp_sheet.api.Columns(gcols).NumberFormatLocal = "[$-x-systime]h:mm:ss AM/PM"
+
+        # 写入血糖数据（仅输出这几行）
+        temp_sheet.range(1, rng_lcol + 2).value = '血糖值' if C else 'Glucose Value'
+        temp_sheet.range(2, rng_lcol + 1).options(transpose=True).value = [t for t, _ in records] or None
+        temp_sheet.range(2, rng_lcol + 2).options(transpose=True).value = [v for _, v in records] or None
 
         return rng_lcol
 
@@ -1327,7 +1412,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             self.add_gradient_data(wb, sheetnames, expInfo, timearr, C, diffwords, wave)
 
             # 14. 添加血糖数据
-            rng_lcol = self.add_glucose_data(wb, sheetnames, timearr, yinterp, C)
+            rng_lcol = self.add_glucose_data(wb, sheetnames, timearr, yinterp, C, expInfo=expInfo)
 
             # 15. 创建图表
             self.create_charts(wb, sheetnames, timearr, wave, Ch, wn, rng_lcol, expInfo, Chpath, C)
