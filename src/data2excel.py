@@ -543,7 +543,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         # 获取当前周期对应的时间
         current_time = timearr[cycle_index] if cycle_index < len(timearr) else timearr[-1]
         # 将时间转换为当天的小时数部分（仅保留小数部分）
-        time_of_day = float(current_time) % 1.0
+        time_of_day = np.floor(current_time)
 
         # 遍历 baseline_cycle 配置，查找匹配的时间范围
         for item in baseline_cycles:
