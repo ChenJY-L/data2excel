@@ -540,10 +540,13 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         if not baseline_cycles:
             return self.BaseCycle.value()
 
-        # 获取当前周期对应的时间
-        current_time = timearr[cycle_index] if cycle_index < len(timearr) else timearr[-1]
+        # 获取当前周期对应的时间（确保获取标量值）
+        if cycle_index < len(timearr):
+            current_time = float(np.ravel(timearr[cycle_index])[0])
+        else:
+            current_time = float(np.ravel(timearr[-1])[0])
         # 将时间转换为当天的小时数部分（仅保留小数部分）
-        time_of_day = float(current_time) % 1.0
+        time_of_day = current_time % 1.0
 
         # 遍历 baseline_cycle 配置，查找匹配的时间范围
         for item in baseline_cycles:

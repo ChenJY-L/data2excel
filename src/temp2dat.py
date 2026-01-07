@@ -82,7 +82,8 @@ class Temp2Data:
 
 
 if __name__ == '__main__':
-    files = ['../lvtemporary_233412.xlsx', '../lvtemporary_240822.xlsx']
+    files = ["C:/Users/Dell/Desktop/20251204-空腹-75M24-小臂皮包骨-3MPET胶-cyh/温度数据.xlsx",
+             "C:/Users/Dell/Desktop/20251204-空腹-75M24-小臂皮包骨-3MPET胶-cyh/皮肤温度.xlsx",]
     out_dir = '../'
     t2d = Temp2Data(out_dir, files)
     t2d.align_and_generate()
