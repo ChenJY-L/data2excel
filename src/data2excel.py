@@ -82,8 +82,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
     用于设置复制放大的chart的id和需要忽略的chart
     """
     Duplicate_Target = {
-        "index": [2, 5, 8, 11],
-        "ignore_series": [[], [2,3,4], [], []]
+        "index": [2, 10, 5, 8, 11],
+        "ignore_series": [[], [], [2,3,4], [], []]
     }
 
     def __init__(self, parent=None):
@@ -1358,8 +1358,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
         if self.TempCheckBox.isChecked():
             tempindex = ['4', '5', '12', '0',
-                         '15', '0', '0', '0',
-                         '0', '12', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
+                         '15', '33', '0', '0',
+                         '0', '12', '15', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
         else:
             tempindex = ['0', '0', '0', '0',
                          '0', '0', '0', '0',
@@ -1793,6 +1793,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                         chartApi.SeriesCollection().Add(Source=secrange.api, SeriesLabels=True)
                         chartApi.ChartColor = 10
                         series_count = chartApi.SeriesCollection().Count
+                        series_name = chartApi.SeriesCollection(series_count).Name
                         chartApi.SeriesCollection(series_count).AxisGroup = 2
                         chartApi.SeriesCollection(series_count).Format.Line.Weight = self.LINE_WEIGHT
                         secondary_axis_series_count += 1
@@ -1831,10 +1832,10 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             if self.duplicateCheckBox.isChecked() and p in self.Duplicate_Target["index"]:
                 duplicate_index = self.Duplicate_Target["index"].index(p)
                 duplicated_chart = chartApi.Parent.Duplicate()
-                duplicated_chart.Top = 200 + self.CHART_TOP + self.CHART_HEIGHT*3 + duplicate_index*1.2*self.CHART_HEIGHT
+                duplicated_chart.Top = 200 + self.CHART_TOP + self.CHART_HEIGHT*3 + duplicate_index*0.85*self.CHART_HEIGHT
                 duplicated_chart.Left = self.CHART_LEFT + self.CHART_WIDTH
                 duplicated_chart.Width = 2.5 * self.CHART_WIDTH
-                duplicated_chart.Height = 1.2 * self.CHART_HEIGHT
+                duplicated_chart.Height = 0.85 * self.CHART_HEIGHT
 
                 for ignore_index in self.Duplicate_Target["ignore_series"][duplicate_index]:
                     duplicated_chart.Chart.FullSeriesCollection(ignore_index).IsFiltered = True
