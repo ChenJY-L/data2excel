@@ -1797,6 +1797,23 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                         chartApi.SeriesCollection(series_count).Format.Line.Weight = self.LINE_WEIGHT
                         secondary_axis_series_count += 1
 
+                        # 根据系列名称设置副坐标轴范围
+                        secondary_axis = chartApi.Axes(2, 2)
+                        try:
+                            max_val = max(chartApi.SeriesCollection(series_count).Values)
+
+                            if "TC1实际温度" in series_name:
+                                secondary_axis.MinimumScale = 28
+                                secondary_axis.MaximumScale = max(max_val + 1, 30)
+                            elif "功率" in series_name:
+                                secondary_axis.MinimumScale = 0
+                                secondary_axis.MaximumScale = 1
+                            elif "Default" in series_name:
+                                secondary_axis.MinimumScale = 20
+                                secondary_axis.MaximumScale = max(max_val + 1, 25)
+                        except:
+                            pass  # 如果获取失败，保持自动缩放
+
             # 设置系列标记样式
             for i in range(1, chartApi.SeriesCollection().Count + 1):
                 series = chartApi.SeriesCollection(i)
