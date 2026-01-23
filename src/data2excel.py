@@ -506,7 +506,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             dict: 实验信息字典，如果没有找到文件则返回None
         """
         filePath = os.path.dirname(Chpath)
-        txtFiles = list(Path(filePath).glob('*.txt'))  # 获取所有 .txt 文件列表
+        txtFiles = list(Path(filePath).glob('备注*.txt'))  # 获取所有 .txt 文件列表
 
         if txtFiles:
             # 读取第一个txt文件
