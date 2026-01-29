@@ -247,6 +247,14 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             Cell_Result = Cell_Ran
         return Cell_Result
 
+    def set_office_theme_colors(self, wb):
+        """ 设置sheet的默认配色 """
+        try:
+            theme_path = os.path.abspath(os.path.join(wb.app.api.Path, r"..\Document Themes 16\Theme Colors\Office 2013 - 2022.xml"))
+            wb.api.Theme.ThemeColorScheme.Load(theme_path)
+        except:
+            pass
+
     def parseText(self, text):
         TIME_RE = re.compile(r'^\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*$')
         RANGE_RE = re.compile(r'^\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*-\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*$')
@@ -1386,6 +1394,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         sglSheet = wb.sheets[sheetnames[1]]
         tempSheet = wb.sheets[sheetnames[7]]
 
+        self.set_office_theme_colors(wb)
         # 创建图表的详细实现
         self._create_individual_charts(wb, sheetnames, charttitles, ringsindex, tempindex, infoindex,
                                        wave, Ch, wn, timearr, expInfo, Chpath, C, rng_lcol, pltN, SRRange,
