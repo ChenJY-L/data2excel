@@ -12,7 +12,7 @@
 版本：[版本信息]
 最后更新：[更新日期]
 """
-
+import math
 import re
 import xlwings.utils
 from dateutil import parser
@@ -1805,13 +1805,13 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
                             if "TC1实际温度" in series_name:
                                 secondary_axis.MinimumScale = 28
-                                secondary_axis.MaximumScale = max(max_val + 1, 30)
+                                secondary_axis.MaximumScale = math.ceil(max(max_val + 1, 30))
                             elif "功率" in series_name:
                                 secondary_axis.MinimumScale = 0
                                 secondary_axis.MaximumScale = 1
                             elif "Default" in series_name:
                                 secondary_axis.MinimumScale = 20
-                                secondary_axis.MaximumScale = max(max_val + 1, 25)
+                                secondary_axis.MaximumScale = math.ceil(max(max_val + 1, 25))
                         except:
                             pass  # 如果获取失败，保持自动缩放
 
@@ -2000,6 +2000,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 scale = y_max - y_min
                 p_min = y_min + scale * ratio
                 p_max = y_max - scale * ratio
+
+            p_min, p_max = math.ceil(p_min*1e3)/1e3, math.ceil(p_max*1e3)/1e3
 
             series = chartApi.SeriesCollection().NewSeries()
             series.AxisGroup = axis_index
