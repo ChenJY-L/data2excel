@@ -109,6 +109,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         self.expInfoCheckBox.setChecked(True)
         self.tempCorrelationCheckBox.setChecked(True)
         self.duplicateCheckBox.setChecked(True)
+        self.ClassicCheckBox.setChecked(False)
 
         # 连接信号和槽函数
         self.Process.clicked.connect(self.DataProcess)
@@ -1373,6 +1374,12 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                          '0', '0', '0', '0',
                          '0', '0', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
 
+        if self.ClassicCheckBox.isChecked():
+            tempindex = ['4', '5', '0', '0',
+                         '15', '0', '0', '0',
+                         '0', '12', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
+            charttitles[2] = '1050nm单环吸光度'
+
         infoindex = [False, False, False, False,
                      True, True, True, True,
                      False, False, False, False]
@@ -1387,6 +1394,11 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             charttitles[11] = '温度校正后的波长差分'
             ringsindex[11] = 'Diff1550-Diff1050-temp'
             tempindex[11] = '0'
+
+            if self.ClassicCheckBox.isChecked():
+                charttitles.append('1609nm单环吸光度')
+                ringsindex.append('1609')
+                tempindex.append('0')
 
         pltN = len(charttitles)
         SRRange = 'A1:ZZ2'
@@ -1618,6 +1630,9 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 waveIndex1, waveIndex2 = wave.index(wave1) + 1, wave.index(wave2) + 1
 
                 targets = ['Diff12', 'Diff23', 'Diff34', 'Diff35', 'Diff45']
+                if self.ClassicCheckBox.isChecked():
+                    targets.remove(targets[3])  # 经典模式关闭Diff35
+
                 sheet_target = wb.sheets[sheetnames[4]]
 
                 # 动态获取最后一列索引，并计算新的列名
@@ -1739,6 +1754,10 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             if self.waveDiffCheckBox.isChecked() and len(each) == 17:
                 # 特殊处理Diff1550-Diff1050的位置
                 figure_lft = self.CHART_LEFT
+                figure_top = self.CHART_TOP + self.CHART_HEIGHT * 2
+
+            if p > 11:
+                figure_lft = self.CHART_LEFT + self.CHART_WIDTH * 3
                 figure_top = self.CHART_TOP + self.CHART_HEIGHT * 2
 
             # 创建图表
@@ -2085,6 +2104,10 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             textbox.TextFrame2.TextRange.Characters.Font.Size = self.ANNOTATION_FONT_SIZE
             textbox.TextFrame2.TextRange.Characters.Font.Bold = 1
             textbox.Placement = xw.constants.Placement.xlFreeFloating
+
+            if self.ClassicCheckBox.isChecked():
+                textbox.Top = 200 + self.CHART_TOP + self.CHART_HEIGHT * 3
+                textbox.Left = self.CHART_LEFT + 3.5 * self.CHART_WIDTH
 
         # 添加标题文本框
         titlebox = wb.sheets[sheetnames[4]].shapes.api.AddTextbox(

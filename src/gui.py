@@ -15,14 +15,14 @@ class Ui_Data_Processing(object):
     def setupUi(self, Data_Processing):
         Data_Processing.setObjectName("Data_Processing")
         # 调整窗口大小以适应GroupBox布局
-        Data_Processing.setFixedSize(600, 400)
+        Data_Processing.setFixedSize(650, 400)
         font = QtGui.QFont()
         font.setFamily("Calibri")
         font.setPointSize(10)
 
         # ==================== 数据输入组 ====================
         self.dataInputGroup = QtWidgets.QGroupBox(Data_Processing)
-        self.dataInputGroup.setGeometry(QtCore.QRect(10, 10, 580, 80))
+        self.dataInputGroup.setGeometry(QtCore.QRect(10, 10, 630, 80))
         self.dataInputGroup.setFont(font)
         self.dataInputGroup.setObjectName("dataInputGroup")
 
@@ -43,7 +43,7 @@ class Ui_Data_Processing(object):
 
         # 文件路径
         self.Path = QtWidgets.QTextEdit(self.dataInputGroup)
-        self.Path.setGeometry(QtCore.QRect(230, 25, 250, 25))
+        self.Path.setGeometry(QtCore.QRect(230, 25, 300, 25))
         path_font = QtGui.QFont()
         path_font.setFamily("Calibri")
         path_font.setPointSize(9)
@@ -52,13 +52,13 @@ class Ui_Data_Processing(object):
 
         # 文件选择按钮
         self.FileSelect = QtWidgets.QPushButton(self.dataInputGroup)
-        self.FileSelect.setGeometry(QtCore.QRect(490, 25, 80, 25))
+        self.FileSelect.setGeometry(QtCore.QRect(540, 25, 80, 25))
         self.FileSelect.setFont(font)
         self.FileSelect.setObjectName("FileSelect")
 
         # ==================== 处理选项组 ====================
         self.optionsGroup = QtWidgets.QGroupBox(Data_Processing)
-        self.optionsGroup.setGeometry(QtCore.QRect(10, 100, 580, 100))
+        self.optionsGroup.setGeometry(QtCore.QRect(10, 100, 630, 100))
         self.optionsGroup.setFont(font)
         self.optionsGroup.setObjectName("optionsGroup")
 
@@ -124,6 +124,12 @@ class Ui_Data_Processing(object):
         self.duplicateCheckBox.setChecked(False)
         self.duplicateCheckBox.setObjectName("duplicateCheckBox")
 
+        self.ClassicCheckBox = QtWidgets.QCheckBox(self.optionsGroup)
+        self.ClassicCheckBox.setGeometry(QtCore.QRect(515, 55, 100, 25))
+        self.ClassicCheckBox.setFont(font)
+        self.ClassicCheckBox.setChecked(False)
+        self.ClassicCheckBox.setObjectName("ClassicCheckBox")
+
         # ==================== 参数设置组 ====================
         self.parametersGroup = QtWidgets.QGroupBox(Data_Processing)
         self.parametersGroup.setGeometry(QtCore.QRect(10, 210, 280, 60))
@@ -146,7 +152,7 @@ class Ui_Data_Processing(object):
 
         # ==================== 控制组 ====================
         self.controlGroup = QtWidgets.QGroupBox(Data_Processing)
-        self.controlGroup.setGeometry(QtCore.QRect(300, 210, 290, 60))
+        self.controlGroup.setGeometry(QtCore.QRect(350, 210, 290, 60))
         self.controlGroup.setFont(font)
         self.controlGroup.setObjectName("controlGroup")
 
@@ -178,7 +184,7 @@ class Ui_Data_Processing(object):
 
         # ==================== 信息显示组 ====================
         self.infoGroup = QtWidgets.QGroupBox(Data_Processing)
-        self.infoGroup.setGeometry(QtCore.QRect(10, 280, 580, 80))
+        self.infoGroup.setGeometry(QtCore.QRect(10, 280, 630, 80))
         self.infoGroup.setFont(font)
         self.infoGroup.setObjectName("infoGroup")
 
@@ -190,7 +196,7 @@ class Ui_Data_Processing(object):
 
         self.ErrorText = QtWidgets.QTextEdit(self.infoGroup)
         # self.ErrorText.setEnabled(False)
-        self.ErrorText.setGeometry(QtCore.QRect(70, 25, 500, 45))
+        self.ErrorText.setGeometry(QtCore.QRect(70, 25, 550, 45))
         error_font = QtGui.QFont()
         error_font.setFamily("Calibri")
         error_font.setPointSize(9)
@@ -228,6 +234,7 @@ class Ui_Data_Processing(object):
         self.gradientCheckBox.setText(_translate("Data_Processing", "Gradient"))
         self.tempCorrelationCheckBox.setText(_translate("Data_Processing", "Temp Corr"))
         self.duplicateCheckBox.setText(_translate("Data_Processing", "Duplicate"))
+        self.ClassicCheckBox.setText(_translate("Data_Processing", "Classic Mode"))
 
         self.BaseCycleLabel.setText(_translate("Data_Processing", "Base Cycle:"))
 
