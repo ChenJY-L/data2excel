@@ -582,9 +582,11 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         """
         计算基准周期的单环和差分数据
         支持多基准周期：预计算所有可能的基准周期数据
+        
+        性能优化：使用NumPy向量化替代三重嵌套循环
 
         Args:
-            Chvalues: 各环数据数组
+            Chvalues: 各环数据数组 (Ch, n_rows, n_cols)
             Ch: 环数
             wn: 波长数量
             m: 每次测量数加一
@@ -610,16 +612,24 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         diffNo = int(Ch * (Ch - 1) // 2)
 
         for base_cycle in base_cycles:
-            basesingle = np.zeros((Ch, wn))
+            # 获取基准周期的行索引范围
+            base_start = (base_cycle - 1) * wn
+            base_end = base_start + wn
+            
+            # 向量化计算单环基准数据: 取所有环的基准周期数据，计算前m-1列的均值
+            # Chvalues shape: (Ch, n_rows, n_cols)
+            base_data = Chvalues[:, base_start:base_end, :m - 1]  # (Ch, wn, m-1)
+            basesingle = np.mean(base_data, axis=2)  # (Ch, wn)
+            
+            # 向量化计算差分基准数据
             basediff = np.zeros((diffNo, wn))
-
-            for w in range(0, wn):
-                cs = -1
-                for r in range(0, Ch):
-                    basesingle[r][w] = sum(Chvalues[r][(base_cycle - 1) * 6 + w][:m - 1]) / (m - 1)
-                    for rl in range(r + 1, Ch):
-                        cs = cs + 1
-                        basediff[cs][w] = sum(np.log(Chvalues[r][(base_cycle - 1) * 6 + w][:m - 1] / Chvalues[rl][(base_cycle - 1) * 6 + w][:m - 1])) / (m - 1)
+            cs = 0
+            for r in range(Ch):
+                for rl in range(r + 1, Ch):
+                    # 对数差分的均值
+                    log_ratio = np.log(base_data[r] / base_data[rl])  # (wn, m-1)
+                    basediff[cs] = np.mean(log_ratio, axis=1)  # (wn,)
+                    cs += 1
 
             basesingle_dict[base_cycle] = basesingle
             basediff_dict[base_cycle] = basediff
@@ -757,6 +767,11 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         """
         处理单环数据并写入Excel
         支持多基准周期数据处理
+        
+        性能优化：
+        1. 预计算时间索引
+        2. 缓存工作表引用
+        3. 批量写入数据
 
         Args:
             wb: Excel工作簿对象
@@ -773,55 +788,79 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             timearr: 时间数组（用于多基准周期判断）
             expInfo: 实验信息（用于多基准周期判断）
         """
-        for r in range(0, Ch):
-            # 写入数据头
-            for s in range(0, 3):
-                wb.sheets[sheetnames[s]].range(1, 3 + 7 * r).value = ringwords[r]
-                wb.sheets[sheetnames[s]].range(2, 4 + 7 * r).value = wave
-
-            # 计算各列数据
-            self.GuiRefresh(self.Status, 'Writing Ring ' + str(r + 1))
-            singlearr = []
-            singleabsarr = []
-            singlesnrarr = []
-
-            for j in datarange:  # len(Chvalues[0])或者n
-
-                # 利用时间戳数值远远大于数据的特点，判断时间的索引，提取时间索引前的全部数据
+        self.GuiRefresh(self.Status, 'Processing Single Ring Data...')
+        
+        # 缓存工作表引用以减少API调用
+        sheets = [wb.sheets[sheetnames[i]] for i in range(7)]
+        
+        # 预计算每行的时间索引 (用于确定有效数据范围)
+        time_indices = np.zeros(n, dtype=int)
+        for j in datarange:
+            raw_data = Chvalues[0][j]  # 使用第一环作为参考
+            if np.isnan(raw_data).all():
+                time_indices[j] = m - 1  # 默认值
+            else:
+                time_indices[j] = np.nanargmax(raw_data)
+        
+        # 预计算每个周期对应的基准周期索引
+        num_cycles = n // wn
+        base_cycle_map = np.array([
+            self.get_baseline_for_cycle(cycle_idx, timearr, expInfo) 
+            for cycle_idx in range(num_cycles)
+        ])
+        
+        # 存储所有环的计算结果，用于批量写入
+        all_singlearr = np.zeros((Ch, num_cycles, wn))
+        all_singleabsarr = np.zeros((Ch, num_cycles, wn))
+        all_singlesnrarr = np.zeros((Ch, num_cycles, wn))
+        
+        for r in range(Ch):
+            self.GuiRefresh(self.Status, f'Calculating Ring {r + 1}')
+            
+            for j in datarange:
+                time_idx = time_indices[j]
                 raw_data = Chvalues[r][j]
+                
                 if np.isnan(raw_data).all():
                     raw_data = np.ones(np.size(raw_data))
-                time_index = np.nanargmax(raw_data)
-                singles = raw_data[:time_index]
+                    time_idx = m - 1
+                
+                singles = raw_data[:time_idx]
                 single = np.mean(singles)
-
-                # 获取当前周期对应的基准周期
+                
                 cycle_index = j // wn
-                base_cycle = self.get_baseline_for_cycle(cycle_index, timearr, expInfo)
+                wave_index = j % wn
+                base_cycle = base_cycle_map[cycle_index]
                 basesingle = basesingle_dict[base_cycle]
-
-                singleabs = np.log(basesingle[r][j % wn] / single)
-                singlesnr = single / np.std(singles, ddof=1)
-                singlearr.append(single)
-                singleabsarr.append(singleabs)
-                singlesnrarr.append(singlesnr)
-
-            singlearr = np.array([singlearr]).reshape(n // wn, wn)
-            singleabsarr = np.array([singleabsarr]).reshape(n // wn, wn)
-            singlesnrarr = np.array([singlesnrarr]).reshape(n // wn, wn)
-            singleave = singlearr.mean(axis=0)
-            singlesnrave = singlesnrarr.mean(axis=0)
-
+                
+                singleabs = np.log(basesingle[r][wave_index] / single)
+                singlesnr = single / np.std(singles, ddof=1) if len(singles) > 1 else 0
+                
+                all_singlearr[r, cycle_index, wave_index] = single
+                all_singleabsarr[r, cycle_index, wave_index] = singleabs
+                all_singlesnrarr[r, cycle_index, wave_index] = singlesnr
+        
+        # 批量写入所有数据
+        self.GuiRefresh(self.Status, 'Writing Single Ring Data...')
+        for r in range(Ch):
+            # 写入数据头
+            for s in range(3):
+                sheets[s].range(1, 3 + 7 * r).value = ringwords[r]
+                sheets[s].range(2, 4 + 7 * r).value = wave
+            
             # 写入数据
-            wb.sheets[sheetnames[0]].range(3, 4 + 7 * r).value = singlearr
-            wb.sheets[sheetnames[1]].range(3, 4 + 7 * r).value = singleabsarr
-            wb.sheets[sheetnames[2]].range(3, 4 + 7 * r).value = singlesnrarr
-            wb.sheets[sheetnames[6]].range(5 + r, 5).value = singleave
-            wb.sheets[sheetnames[6]].range(5 + r, 15).value = singlesnrave
-
-            self.currenttime = datetime.datetime.now()
-            self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
-
+            singlearr = all_singlearr[r]
+            singleabsarr = all_singleabsarr[r]
+            singlesnrarr = all_singlesnrarr[r]
+            
+            sheets[0].range(3, 4 + 7 * r).value = singlearr
+            sheets[1].range(3, 4 + 7 * r).value = singleabsarr
+            sheets[2].range(3, 4 + 7 * r).value = singlesnrarr
+            sheets[6].range(5 + r, 5).value = singlearr.mean(axis=0)
+            sheets[6].range(5 + r, 15).value = singlesnrarr.mean(axis=0)
+        
+        self.currenttime = datetime.datetime.now()
+        self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
         wb.save()
         self.GuiRefresh(self.Status, 'Writing Single Finished')
 
@@ -829,6 +868,11 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         """
         处理差分数据并写入Excel
         支持多基准周期数据处理
+        
+        性能优化：
+        1. 预计算时间索引
+        2. 缓存工作表引用和基准周期映射
+        3. 批量计算和写入数据
 
         Args:
             wb: Excel工作簿对象
@@ -845,61 +889,98 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             timearr: 时间数组（用于多基准周期判断）
             expInfo: 实验信息（用于多基准周期判断）
         """
+        self.GuiRefresh(self.Status, 'Processing Differential Data...')
+        
+        # 缓存工作表引用
+        sheets = {i: wb.sheets[sheetnames[i]] for i in [3, 4, 5, 6]}
+        
+        # 预计算时间索引
+        time_indices = np.zeros(n, dtype=int)
+        for j in datarange:
+            raw_data = Chvalues[0][j]
+            if np.isnan(raw_data).all():
+                time_indices[j] = m - 1
+            else:
+                time_indices[j] = np.nanargmax(raw_data)
+        
+        # 预计算基准周期映射
+        num_cycles = n // wn
+        base_cycle_map = np.array([
+            self.get_baseline_for_cycle(cycle_idx, timearr, expInfo) 
+            for cycle_idx in range(num_cycles)
+        ])
+        
+        # 计算差分对数量
+        diffNo = int(Ch * (Ch - 1) // 2)
+        
+        # 预分配所有差分数据的存储空间
+        all_diffarr = np.zeros((diffNo, num_cycles, wn))
+        all_diffabsarr = np.zeros((diffNo, num_cycles, wn))
+        all_diffsnrarr = np.zeros((diffNo, num_cycles, wn))
+        
+        # 计算所有差分对的数据
         cs = -1
-        for r in range(0, Ch):
+        for r in range(Ch):
             for rl in range(r + 1, Ch):
-                # 写入数据头
-                cs = cs + 1
-                for s in range(3, 6):
-                    wb.sheets[sheetnames[s]].range(1, 3 + 7 * cs).value = diffwords[cs]
-                    wb.sheets[sheetnames[s]].range(2, 4 + 7 * cs).value = wave
-
-                # 计算各列数据
-                self.GuiRefresh(self.Status, 'Writing Diff ' + str(r + 1) + str(rl + 1))
-                diffarr = np.empty((n, 1))
-                diffabsarr = np.empty((n, 1))
-                diffsnrarr = np.empty((n, 1))
-
-                for j in datarange:  # len(Chvalues[0])或者n
-
-                    # ASKME: Same
-                    # diffs = np.log(Chvalues[r][j][1:m - 1] / Chvalues[rl][j][1:m - 1])
-                    # diff = sum(diffs) / (m - 2)
+                cs += 1
+                self.GuiRefresh(self.Status, f'Calculating Diff {r + 1}{rl + 1}')
+                
+                for j in datarange:
+                    time_idx = time_indices[j]
                     raw_data = Chvalues[r][j]
+                    
                     if np.isnan(raw_data).all():
-                        raw_data = np.ones(np.size(raw_data))
-                    time_index = np.nanargmax(raw_data)
-
-                    diffs = np.log(Chvalues[r][j][:time_index] / Chvalues[rl][j][:time_index])
-                    diff = np.mean(diffs)
-
-                    # 获取当前周期对应的基准周期
+                        time_idx = m - 1
+                    
+                    # 差分计算
+                    data_r = Chvalues[r][j][:time_idx]
+                    data_rl = Chvalues[rl][j][:time_idx]
+                    
+                    # 处理可能的零值或负值
+                    with np.errstate(divide='ignore', invalid='ignore'):
+                        diffs = np.log(data_r / data_rl)
+                        diffs = np.nan_to_num(diffs, nan=0.0, posinf=0.0, neginf=0.0)
+                    
+                    diff = np.mean(diffs) if len(diffs) > 0 else 0
+                    
                     cycle_index = j // wn
-                    base_cycle = self.get_baseline_for_cycle(cycle_index, timearr, expInfo)
+                    wave_index = j % wn
+                    base_cycle = base_cycle_map[cycle_index]
                     basediff = basediff_dict[base_cycle]
-
-                    diffabs = diff - basediff[cs][j % wn]
-                    diffsnr = 1 / np.std(diffs, ddof=1)
-                    diffarr[j] = diff
-                    diffabsarr[j] = diffabs
-                    diffsnrarr[j] = diffsnr
-
-                diffarr = diffarr.reshape(n // wn, wn)
-                diffabsarr = np.array([diffabsarr]).reshape(n // wn, wn)
-                diffsnrarr = diffsnrarr.reshape(n // wn, wn)
-                diffarrave = diffarr.mean(axis=0)
-                diffsnrave = diffsnrarr.mean(axis=0)
-
+                    
+                    diffabs = diff - basediff[cs][wave_index]
+                    diffsnr = 1 / np.std(diffs, ddof=1) if len(diffs) > 1 and np.std(diffs, ddof=1) > 0 else 0
+                    
+                    all_diffarr[cs, cycle_index, wave_index] = diff
+                    all_diffabsarr[cs, cycle_index, wave_index] = diffabs
+                    all_diffsnrarr[cs, cycle_index, wave_index] = diffsnr
+        
+        # 批量写入所有数据
+        self.GuiRefresh(self.Status, 'Writing Differential Data...')
+        cs = -1
+        for r in range(Ch):
+            for rl in range(r + 1, Ch):
+                cs += 1
+                
+                # 写入数据头
+                for s in [3, 4, 5]:
+                    sheets[s].range(1, 3 + 7 * cs).value = diffwords[cs]
+                    sheets[s].range(2, 4 + 7 * cs).value = wave
+                
+                # 获取当前差分对的数据
+                diffarr = all_diffarr[cs]
+                diffabsarr = all_diffabsarr[cs]
+                diffsnrarr = all_diffsnrarr[cs]
+                
                 # 写入数据
-                wb.sheets[sheetnames[3]].range(3, 4 + 7 * cs).value = diffarr
-                wb.sheets[sheetnames[4]].range(3, 4 + 7 * cs).value = diffabsarr
-                wb.sheets[sheetnames[5]].range(3, 4 + 7 * cs).value = diffsnrarr
-                wb.sheets[sheetnames[6]].range(5 + Ch + cs, 5).value = diffarrave
-                wb.sheets[sheetnames[6]].range(5 + Ch + cs, 15).value = diffsnrave
-
-                self.currenttime = datetime.datetime.now()
-                self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
-
+                sheets[3].range(3, 4 + 7 * cs).value = diffarr
+                sheets[4].range(3, 4 + 7 * cs).value = diffabsarr
+                sheets[5].range(3, 4 + 7 * cs).value = diffsnrarr
+                sheets[6].range(5 + Ch + cs, 5).value = diffarr.mean(axis=0)
+                sheets[6].range(5 + Ch + cs, 15).value = diffsnrarr.mean(axis=0)
+        
+        self.currenttime = datetime.datetime.now()
+        self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
         wb.save()
         self.GuiRefresh(self.Status, 'Writing Diff Finished')
 
