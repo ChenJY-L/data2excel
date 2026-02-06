@@ -5,6 +5,11 @@ on:
     branches:
       - main
 
+# 并发控制：同一分支只运行最新的
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   update-release:
     name: Update release notes

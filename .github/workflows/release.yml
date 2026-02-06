@@ -9,6 +9,11 @@ on:
     tags:
       - 'v*'
 
+# 并发控制：同一标签只运行最新的
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-release:
     runs-on: windows-latest
