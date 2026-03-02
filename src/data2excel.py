@@ -1480,6 +1480,10 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 charttitles.append('1609nm单环吸光度')
                 ringsindex.append('1609')
                 tempindex.append('0')
+                
+            charttitles.append('1609nm单环吸光度')
+            ringsindex.append('1609')
+            tempindex.append('0')
 
         pltN = len(charttitles)
         SRRange = 'A1:ZZ2'
