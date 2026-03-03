@@ -109,7 +109,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         self.expInfoCheckBox.setChecked(True)
         self.tempCorrelationCheckBox.setChecked(True)
         self.duplicateCheckBox.setChecked(True)
-        self.ClassicCheckBox.setChecked(False)
+        self.classicCheckBox.setChecked(False)
+        self.autoSetBaseCheckBox.setChecked(True)
 
         # 连接信号和槽函数
         self.Process.clicked.connect(self.DataProcess)
@@ -557,7 +558,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         # 将时间转换为当天的小时数部分（仅保留小数部分）
         time_of_day = current_time % 1.0
 
-        # 遍历 baseline_cycle 配置，查找匹配的时间范围
+        # 遍历 baseline_cycle 配置，优先匹配时间段，再匹配时间点（取最近时间点）
+        point_candidates = []
         for item in baseline_cycles:
             time_range = item.get('time')
             value = item.get('value')
@@ -571,14 +573,18 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 if start_time <= time_of_day < end_time:
                     return int(value)
             elif isinstance(time_range, (int, float)):
-                # 单个时间点：该时间之后使用此基准周期
+                # 单个时间点：记录不超过当前时间的候选值
                 if time_of_day >= time_range:
-                    return int(value)
+                    point_candidates.append((float(time_range), int(value)))
+
+        if point_candidates:
+            point_candidates.sort(key=lambda x: x[0])
+            return point_candidates[-1][1]
 
         # 如果没有匹配的配置，返回默认值
         return self.BaseCycle.value()
 
-    def calculate_base_data(self, Chvalues, Ch, wn, m, expInfo=None):
+    def calculate_base_data(self, Chvalues, Ch, wn, m, expInfo=None, base_cycles_override=None):
         """
         计算基准周期的单环和差分数据
         支持多基准周期：预计算所有可能的基准周期数据
@@ -591,6 +597,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             wn: 波长数量
             m: 每次测量数加一
             expInfo: 实验信息（包含 baseline_cycle 配置）
+            base_cycles_override: 指定基准周期集合（优先级高于 expInfo）
 
         Returns:
             tuple: (basesingle_dict, basediff_dict) 基准数据字典，键为基准周期索引
@@ -599,22 +606,28 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
         # 收集所有需要计算的基准周期索引
         base_cycles = {self.BaseCycle.value()}  # 默认基准周期
-
-        if expInfo is not None and expInfo.get('baseline_cycle'):
+        if base_cycles_override is not None:
+            base_cycles = {int(v) for v in base_cycles_override if int(v) >= 1}
+        elif expInfo is not None and expInfo.get('baseline_cycle'):
             for item in expInfo['baseline_cycle']:
                 value = item.get('value')
                 if value is not None:
                     base_cycles.add(int(value))
+
+        if not base_cycles:
+            base_cycles = {self.BaseCycle.value()}
 
         # 为每个基准周期计算基准数据
         basesingle_dict = {}
         basediff_dict = {}
         diffNo = int(Ch * (Ch - 1) // 2)
 
-        for base_cycle in base_cycles:
+        for base_cycle in sorted(base_cycles):
             # 获取基准周期的行索引范围
             base_start = (base_cycle - 1) * wn
             base_end = base_start + wn
+            if base_end > Chvalues.shape[1]:
+                continue
             
             # 向量化计算单环基准数据: 取所有环的基准周期数据，计算前m-1列的均值
             # Chvalues shape: (Ch, n_rows, n_cols)
@@ -634,25 +647,179 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             basesingle_dict[base_cycle] = basesingle
             basediff_dict[base_cycle] = basediff
 
+        # 兜底：如果给定基准周期无效，强制使用第1周期
+        if not basesingle_dict or not basediff_dict:
+            fallback_cycle = 1
+            base_data = Chvalues[:, 0:wn, :m - 1]
+            basesingle = np.mean(base_data, axis=2)
+            basediff = np.zeros((diffNo, wn))
+            cs = 0
+            for r in range(Ch):
+                for rl in range(r + 1, Ch):
+                    log_ratio = np.log(base_data[r] / base_data[rl])
+                    basediff[cs] = np.mean(log_ratio, axis=1)
+                    cs += 1
+            basesingle_dict[fallback_cycle] = basesingle
+            basediff_dict[fallback_cycle] = basediff
+
         return basesingle_dict, basediff_dict
 
-    def create_excel_workbook(self, Chpath, C):
+    def get_output_filepath(self, Chpath, C, suffix=''):
+        """
+        生成输出Excel文件路径
+
+        Args:
+            Chpath: 数据文件路径
+            C: 是否中文文件名
+            suffix: 文件名后缀（不含扩展名）
+
+        Returns:
+            str: 输出文件完整路径
+        """
+        if C:
+            parent = Chpath.replace(Chpath.split('\\')[-1], '')
+            filename = Chpath.split('\\')[-2] + suffix + '.xlsx'
+            return os.path.join(parent, filename)
+        return Chpath.split('Ch')[0] + 'Processed' + suffix + '.xlsx'
+
+    def detect_measurement_segments(self, timearr, gap_minutes=1.0):
+        """
+        根据时间间隔识别分段点
+
+        规则：相邻周期时间差 > gap_minutes 视为新测量段开始。
+        """
+        time_flat = np.asarray(timearr, dtype=float).reshape(-1)
+        if len(time_flat) <= 1:
+            return np.array([0], dtype=int), np.array([], dtype=int), np.array([], dtype=float)
+
+        gaps = np.diff(time_flat) * 24 * 60
+        split_points = np.where(gaps > gap_minutes)[0] + 1
+        segment_starts = np.concatenate(([0], split_points))
+        return segment_starts.astype(int), split_points.astype(int), gaps.astype(float)
+
+    def _excel_fraction_to_hms(self, excel_value):
+        """Excel小数时间转换为 HH:MM:SS 字符串。"""
+        seconds = int(round((float(excel_value) % 1.0) * 24 * 3600))
+        seconds = max(0, min(seconds, 24 * 3600 - 1))
+        h = seconds // 3600
+        m = (seconds % 3600) // 60
+        s = seconds % 60
+        return f"{h:02d}:{m:02d}:{s:02d}"
+
+    def build_auto_baseline_info(self, timearr, gap_minutes=1.0):
+        """
+        构建自动基准周期信息
+
+        Returns:
+            tuple: (baseline_cycle, segment_points)
+                baseline_cycle: parseText 可识别的基准配置列表
+                segment_points: 分段点明细（用于写入sheet）
+        """
+        segment_starts, split_points, gaps = self.detect_measurement_segments(timearr, gap_minutes)
+        time_flat = np.asarray(timearr, dtype=float).reshape(-1)
+
+        baseline_cycle = []
+        for start in segment_starts:
+            baseline_cycle.append({
+                "time": float(time_flat[start] % 1.0),
+                "value": int(start + 1),
+            })
+
+        segment_points = []
+        for split in split_points:
+            segment_points.append({
+                "cycle": int(split + 1),
+                "time": float(time_flat[split]),
+                "gap_minutes": float(gaps[split - 1]),
+            })
+
+        return baseline_cycle, segment_points
+
+    def write_auto_baseline_note_file(self, Chpath, baseline_cycle):
+        """
+        生成自动基准备注文件（备注*.txt）
+        """
+        note_path = os.path.join(os.path.dirname(Chpath), '备注_auto_base.txt')
+        lines = ['基准周期:']
+
+        for item in sorted(baseline_cycle, key=lambda x: float(x['time'])):
+            lines.append(f"{self._excel_fraction_to_hms(item['time'])}: {int(item['value'])}")
+
+        lines.extend([
+            '',
+            '备注:',
+            'Auto-generated by autoSetBaseCheckBox (gap > 1 min).',
+        ])
+        Path(note_path).write_text('\n'.join(lines), encoding='utf-8')
+        return note_path
+
+    def merge_expinfo_with_auto_baseline(self, expInfo, baseline_cycle, note_path=None):
+        """
+        将自动基准配置合并到实验信息中，用于第二次处理。
+        """
+        if isinstance(expInfo, dict):
+            merged = dict(expInfo)
+        else:
+            merged = {
+                "schedule": [],
+                "baseline_cycle": None,
+                "blood_glucose": None,
+                "remark": None
+            }
+
+        merged['baseline_cycle'] = baseline_cycle
+        if note_path:
+            remark_line = f"Auto baseline file: {os.path.basename(note_path)}"
+            if merged.get('remark'):
+                merged['remark'] = str(merged['remark']) + '\n' + remark_line
+            else:
+                merged['remark'] = remark_line
+
+        return merged
+
+    def prepare_main_sheets(self, wb, sheetnames, clear_existing=False):
+        """
+        确保主流程sheet存在；可选清空主流程sheet（保留额外sheet）。
+        """
+        self.GuiRefresh(self.Status, 'Creating Sheets')
+        if self.TempCheckBox.isChecked() or self.isInfo:
+            sheetNo = len(sheetnames)
+        else:
+            sheetNo = len(sheetnames) - 1
+
+        for i in range(sheetNo):
+            if self.CheckSheet(wb, sheetnames[i]) is False:
+                wb.sheets.add(sheetnames[i], after=i + 1)
+                continue
+
+            if clear_existing:
+                ws = wb.sheets[sheetnames[i]]
+                ws.clear()
+                # 清除图表/文本框等形状，避免第二次绘图叠加
+                try:
+                    for shp in list(ws.shapes):
+                        shp.delete()
+                except Exception:
+                    pass
+
+        wb.save()
+
+    def create_excel_workbook(self, Chpath, C, suffix='', reset_file=True):
         """
         创建Excel工作簿和工作表
 
         Args:
             Chpath: 数据文件路径
             C: 是否为中文文件名
+            reset_file: 是否重建输出文件（False时保留现有额外sheet）
 
         Returns:
             xlwings.Book: Excel工作簿对象
         """
         self.GuiRefresh(self.Status, 'Creating Output File')
-        ProcessFilePath = os.path.join(Chpath.replace(Chpath.split('\\')[-1], ''),
-                                       Chpath.split('\\')[-2] + '.xlsx') if C else (
-                                       Chpath.split('Ch')[0] + 'Processed' + '.xlsx')
+        ProcessFilePath = self.get_output_filepath(Chpath, C, suffix)
 
-        if os.path.isfile(ProcessFilePath):
+        if reset_file and os.path.isfile(ProcessFilePath):
             self.GuiRefresh(self.Status, 'Removing Existing Output File')
             try:
                 os.remove(ProcessFilePath)
@@ -665,9 +832,12 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 )
                 raise
 
-        wb = self.xwapp.books.add()  # 在app下创建一个Book
-        wb.save(ProcessFilePath)
-        wb = self.xwapp.books.open(ProcessFilePath)
+        if os.path.isfile(ProcessFilePath):
+            wb = self.xwapp.books.open(ProcessFilePath)
+        else:
+            wb = self.xwapp.books.add()  # 在app下创建一个Book
+            wb.save(ProcessFilePath)
+            wb = self.xwapp.books.open(ProcessFilePath)
 
         # 创建工作表
         sheetnames = ['单环', '单环吸光度', '单环信噪比', '差分', '差分吸光度', '差分等效信噪比',
@@ -675,16 +845,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                                                                      'Single SNR', 'Differential',
                                                                      'Differential Absorbance', 'Differential SNR',
                                                                      'Summary of Intensity and SNR', 'Temperature']
-        self.GuiRefresh(self.Status, 'Creating Sheets')
-        if self.TempCheckBox.isChecked() or self.isInfo: # 存在备注或选中温度选项时，创建`温度数据` Sheet
-            sheetNo = len(sheetnames)
-        else:
-            sheetNo = len(sheetnames) - 1
-
-        for i in range(0, sheetNo):
-            if self.CheckSheet(wb, sheetnames[i]) == False:
-                wb.sheets.add(sheetnames[i], after=i + 1)
-        wb.save()
+        self.prepare_main_sheets(wb, sheetnames, clear_existing=not reset_file)
 
         return wb, sheetnames
 
@@ -984,6 +1145,124 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         wb.save()
         self.GuiRefresh(self.Status, 'Writing Diff Finished')
 
+    def calculate_auto_absorbance_arrays(self, Chvalues, Ch, n, wn, m, datarange, timearr, expInfo):
+        """
+        基于自动基准配置，仅计算单环吸光度与差分吸光度数组。
+        """
+        self.GuiRefresh(self.Status, 'Calculating AutoBase Absorbance Arrays...')
+
+        basesingle_dict, basediff_dict = self.calculate_base_data(Chvalues, Ch, wn, m, expInfo)
+        default_single_cycle = sorted(basesingle_dict.keys())[0]
+        default_diff_cycle = sorted(basediff_dict.keys())[0]
+
+        # 预计算时间索引
+        time_indices = np.zeros(n, dtype=int)
+        for j in datarange:
+            raw_data = Chvalues[0][j]
+            if np.isnan(raw_data).all():
+                time_indices[j] = m - 1
+            else:
+                time_indices[j] = np.nanargmax(raw_data)
+
+        num_cycles = n // wn
+        base_cycle_map = np.array([
+            self.get_baseline_for_cycle(cycle_idx, timearr, expInfo)
+            for cycle_idx in range(num_cycles)
+        ])
+
+        # 单环吸光度
+        all_singleabsarr = np.zeros((Ch, num_cycles, wn))
+        for r in range(Ch):
+            for j in datarange:
+                time_idx = time_indices[j]
+                raw_data = Chvalues[r][j]
+                if np.isnan(raw_data).all():
+                    raw_data = np.ones(np.size(raw_data))
+                    time_idx = m - 1
+
+                singles = raw_data[:time_idx]
+                single = np.mean(singles)
+
+                cycle_index = j // wn
+                wave_index = j % wn
+                base_cycle = base_cycle_map[cycle_index]
+                basesingle = basesingle_dict.get(base_cycle, basesingle_dict[default_single_cycle])
+                all_singleabsarr[r, cycle_index, wave_index] = np.log(basesingle[r][wave_index] / single)
+
+        # 差分吸光度
+        diffNo = int(Ch * (Ch - 1) // 2)
+        all_diffabsarr = np.zeros((diffNo, num_cycles, wn))
+        cs = -1
+        for r in range(Ch):
+            for rl in range(r + 1, Ch):
+                cs += 1
+                for j in datarange:
+                    time_idx = time_indices[j]
+                    if np.isnan(Chvalues[r][j]).all():
+                        time_idx = m - 1
+
+                    data_r = Chvalues[r][j][:time_idx]
+                    data_rl = Chvalues[rl][j][:time_idx]
+                    with np.errstate(divide='ignore', invalid='ignore'):
+                        diffs = np.log(data_r / data_rl)
+                        diffs = np.nan_to_num(diffs, nan=0.0, posinf=0.0, neginf=0.0)
+                    diff = np.mean(diffs) if len(diffs) > 0 else 0
+
+                    cycle_index = j // wn
+                    wave_index = j % wn
+                    base_cycle = base_cycle_map[cycle_index]
+                    basediff = basediff_dict.get(base_cycle, basediff_dict[default_diff_cycle])
+                    all_diffabsarr[cs, cycle_index, wave_index] = diff - basediff[cs][wave_index]
+
+        return all_singleabsarr, all_diffabsarr
+
+    def write_auto_absorbance_sheets(self, wb, sheetnames, C, wave, ringwords, diffwords,
+                                     timearr, cycleNoarr, all_singleabsarr, all_diffabsarr):
+        """
+        写入自动基准周期的单环吸光度与差分吸光度sheet。
+        """
+        auto_single = sheetnames[1] + ('-自动基准' if C else '-autobase')
+        auto_diff = sheetnames[4] + ('-自动基准' if C else '-autobase')
+
+        # 创建或清理目标sheet
+        for target in (auto_single, auto_diff):
+            if self.CheckSheet(wb, target):
+                ws = wb.sheets[target]
+                ws.clear()
+                try:
+                    for shp in list(ws.shapes):
+                        shp.delete()
+                except Exception:
+                    pass
+            else:
+                wb.sheets.add(target, after=wb.sheets[len(wb.sheets) - 1])
+
+        ws_single = wb.sheets[auto_single]
+        ws_diff = wb.sheets[auto_diff]
+
+        # 时间与周期列
+        ws_single.range(3, 1).value = timearr
+        ws_single.range(3, 2).value = cycleNoarr
+        ws_diff.range(3, 1).value = timearr
+        ws_diff.range(3, 2).value = cycleNoarr
+
+        # 单环吸光度写入
+        Ch = all_singleabsarr.shape[0]
+        for r in range(Ch):
+            ws_single.range(1, 3 + 7 * r).value = ringwords[r]
+            ws_single.range(2, 4 + 7 * r).value = wave
+            ws_single.range(3, 4 + 7 * r).value = all_singleabsarr[r]
+
+        # 差分吸光度写入
+        diffNo = all_diffabsarr.shape[0]
+        for cs in range(diffNo):
+            ws_diff.range(1, 3 + 7 * cs).value = diffwords[cs]
+            ws_diff.range(2, 4 + 7 * cs).value = wave
+            ws_diff.range(3, 4 + 7 * cs).value = all_diffabsarr[cs]
+
+        wb.save()
+        return auto_single, auto_diff
+
     def handle_dynamic_base_cycle(self, wb, sheetnames, Ch, n, wn, C):
         """
         处理动态基准周期功能
@@ -996,7 +1275,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             wn: 波长数量
             C: 是否为中文文件名
         """
-        if self.DyBCCheckBox.isChecked():
+        if self.DyBCCheckBox.isChecked() and not self.autoSetBaseCheckBox.isChecked():
             wb.sheets[sheetnames[1]].range(3, 3).value = '单环基准周期' if C else 'Single Base Cycle'
             wb.sheets[sheetnames[1]].range(4, 3).value = self.BaseCycle.value()
             wb.sheets[sheetnames[4]].range(3, 3).value = '差分基准周期' if C else 'Single Base Cycle'
@@ -1455,7 +1734,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                          '0', '0', '0', '0',
                          '0', '0', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
 
-        if self.ClassicCheckBox.isChecked():
+        if self.classicCheckBox.isChecked():
             tempindex = ['4', '5', '0', '0',
                          '15', '0', '0', '0',
                          '0', '12', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
@@ -1476,7 +1755,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             ringsindex[11] = 'Diff1550-Diff1050-temp'
             tempindex[11] = '0'
 
-            if self.ClassicCheckBox.isChecked():
+            if self.classicCheckBox.isChecked():
                 charttitles.append('1609nm单环吸光度')
                 ringsindex.append('1609')
                 tempindex.append('0')
@@ -1488,7 +1767,14 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         pltN = len(charttitles)
         SRRange = 'A1:ZZ2'
         diffSheet = wb.sheets[sheetnames[4]]
-        sglSheet = wb.sheets[sheetnames[1]]
+
+        # 根据图表目标sheet判断单环吸光度数据源
+        sgl_sheet_name = sheetnames[1]
+        if sheetnames[4].endswith('-原始') and not sgl_sheet_name.endswith('-原始'):
+            sgl_sheet_name = sgl_sheet_name + '-原始'
+        elif sheetnames[4].endswith('-raw') and not sgl_sheet_name.endswith('-raw'):
+            sgl_sheet_name = sgl_sheet_name + '-raw'
+        sglSheet = wb.sheets[sgl_sheet_name]
         tempSheet = wb.sheets[sheetnames[7]]
 
         self.set_office_theme_colors(wb)
@@ -1496,6 +1782,179 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         self._create_individual_charts(wb, sheetnames, charttitles, ringsindex, tempindex, infoindex,
                                        wave, Ch, wn, timearr, expInfo, Chpath, C, rng_lcol, pltN, SRRange,
                                        diffSheet, sglSheet, tempSheet)
+
+    def write_segment_points_sheet(self, wb, segment_points, C):
+        """
+        将分段点时间写入单独工作表
+        """
+        if segment_points is None:
+            return
+
+        sheet_name = '分段点时间' if C else 'Segment Points'
+        if self.CheckSheet(wb, sheet_name):
+            ws = wb.sheets[sheet_name]
+            ws.clear()
+        else:
+            ws = wb.sheets.add(sheet_name, after=wb.sheets[len(wb.sheets) - 1])
+
+        headers = ['序号', '基准周期', '分段时间'] if C else [
+            'No.', 'Base Cycle', 'Segment Time'
+        ]
+        ws.range(1, 1).value = headers
+
+        rows = []
+        for i, item in enumerate(segment_points, 1):
+            rows.append([
+                i,
+                int(item['cycle']),
+                float(item['time'])
+            ])
+
+        ws.range(2, 1).value = rows
+        if rows:
+            ws.range(2, 3).resize(len(rows), 1).number_format = 'h:mm:ss'
+
+    def reorder_result_sheets(self, wb, primary_sheetnames, secondary_sheetnames=None):
+        """
+        调整结果sheet顺序：
+        1) primary与secondary交错排列（若提供secondary）
+        2) 其他sheet保持在后面
+        """
+        desired = []
+        if secondary_sheetnames:
+            for p, s in zip(primary_sheetnames, secondary_sheetnames):
+                desired.append(p)
+                desired.append(s)
+        else:
+            desired.extend(primary_sheetnames)
+
+        existing = [s.name for s in wb.sheets]
+        managed = [name for name in desired if name in existing]
+        if not managed:
+            return
+
+        # 先把第一个托到最前面，再按顺序依次放到前一个后面
+        wb.sheets[managed[0]].api.Move(Before=wb.sheets[1].api)
+        for i in range(1, len(managed)):
+            wb.sheets[managed[i]].api.Move(After=wb.sheets[managed[i - 1]].api)
+
+        # 若分段sheet存在，固定在已管理sheet之后
+        for seg_name in ('分段点时间', 'Segment Points'):
+            if seg_name in [s.name for s in wb.sheets]:
+                wb.sheets[seg_name].api.Move(After=wb.sheets[managed[-1]].api)
+                break
+        wb.save()
+
+    def apply_sheet_order(self, wb, desired_names):
+        """
+        按给定名称顺序重排sheet（仅处理存在的名称）。
+        """
+        ordered = [name for name in desired_names if self.CheckSheet(wb, name)]
+        if not ordered:
+            return
+
+        for target_pos, name in enumerate(ordered, start=1):
+            sheet = wb.sheets[name]
+            if sheet.api.Index == target_pos:
+                continue
+            if target_pos == 1:
+                sheet.api.Move(Before=wb.sheets[1].api)
+            else:
+                sheet.api.Move(After=wb.sheets[target_pos - 1].api)
+
+    def promote_autobase_absorbance_sheets(self, wb, sheetnames, C):
+        """
+        将自动基准sheet提升为正式sheet名，并把原始sheet改名为-原始，随后互换位置。
+        """
+        auto_suffix = '-自动基准' if C else '-autobase'
+        raw_suffix = '-原始' if C else '-raw'
+
+        pairs = [
+            (sheetnames[1], sheetnames[1] + auto_suffix, sheetnames[1] + raw_suffix),
+            (sheetnames[4], sheetnames[4] + auto_suffix, sheetnames[4] + raw_suffix),
+        ]
+
+        for base_name, auto_name, raw_name in pairs:
+            if not self.CheckSheet(wb, base_name) or not self.CheckSheet(wb, auto_name):
+                continue
+            if self.CheckSheet(wb, raw_name):
+                wb.sheets[raw_name].delete()
+            wb.sheets[base_name].name = raw_name
+            wb.sheets[auto_name].name = base_name
+
+        # 互换位置：让正式sheet回到原始位置，-原始去自动sheet原位置
+        names = [s.name for s in wb.sheets]
+        for base_name, _, raw_name in pairs:
+            if base_name in names and raw_name in names:
+                i_base = names.index(base_name)
+                i_raw = names.index(raw_name)
+                names[i_base], names[i_raw] = names[i_raw], names[i_base]
+
+        self.apply_sheet_order(wb, names)
+        wb.save()
+
+    def run_processing_pass(self, Chvalues, Ch, C, Chpath, Tempvalue, Temptitle, expInfo,
+                            n, wn, m, datarange, wave, ringwords, diffwords,
+                            timearr, cycleNoarr, segment_points=None, reset_file=True,
+                            wb=None, sheetnames=None, clear_existing=False, close_wb=True):
+        """
+        执行一次完整处理流程（从基准计算到绘图）
+        """
+        # 计算基准周期数据
+        basesingle_dict, basediff_dict = self.calculate_base_data(Chvalues, Ch, wn, m, expInfo)
+
+        # 创建/复用输出文件
+        if wb is None or sheetnames is None:
+            wb, sheetnames = self.create_excel_workbook(Chpath, C, reset_file=reset_file)
+        elif clear_existing:
+            self.prepare_main_sheets(wb, sheetnames, clear_existing=True)
+        self.currenttime = datetime.datetime.now()
+        self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
+
+        # 写入时间和标题
+        self.write_time_and_headers(wb, sheetnames, timearr, cycleNoarr)
+        self.currenttime = datetime.datetime.now()
+        self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
+
+        # 温度插值
+        yinterp = self.process_temperature_interpolation(wb, sheetnames, timearr, cycleNoarr, Tempvalue, Temptitle)
+        self.currenttime = datetime.datetime.now()
+        self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
+
+        # 汇总标题
+        self.write_summary_data(wb, sheetnames, wave, ringwords, diffwords, Ch, C)
+
+        # 单环与差分
+        self.process_single_ring_data(
+            wb, sheetnames, Chvalues, Ch, ringwords, wave, datarange,
+            basesingle_dict, n, wn, m, timearr, expInfo
+        )
+        self.process_differential_data(
+            wb, sheetnames, Chvalues, Ch, diffwords, wave, datarange,
+            basediff_dict, n, wn, m, timearr, expInfo
+        )
+
+        # 动态基准（Auto Base 打开时不覆盖）
+        self.handle_dynamic_base_cycle(wb, sheetnames, Ch, n, wn, C)
+
+        # 备注与梯度
+        self.add_info_data(wb, sheetnames, expInfo, timearr)
+        self.add_gradient_data(wb, sheetnames, expInfo, timearr, C, diffwords, wave)
+
+        # 血糖
+        rng_lcol = self.add_glucose_data(wb, sheetnames, timearr, yinterp, C, expInfo=expInfo)
+
+        # 分段点sheet（仅第二次处理写入）
+        if segment_points is not None:
+            self.write_segment_points_sheet(wb, segment_points, C)
+
+        # 图表
+        self.charts = []
+        self.create_charts(wb, sheetnames, timearr, wave, Ch, wn, rng_lcol, expInfo, Chpath, C)
+
+        if close_wb:
+            wb.close()
+        return rng_lcol
 
     # 数据处理主函数
     def DataProcess(self):
@@ -1510,6 +1969,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         5. Excel文件生成
         6. 图表绘制
         """
+        wb = None
         try:
             self.Process.setEnabled(False)
             self.starttime = datetime.datetime.now()
@@ -1568,50 +2028,51 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 timearr[l] = timeele
                 cycleNoarr[l] = l + 1
 
-            # 5. 计算基准周期数据（支持多基准周期）
-            basesingle_dict, basediff_dict = self.calculate_base_data(Chvalues, Ch, wn, m, expInfo)
+            if self.autoSetBaseCheckBox.isChecked():
+                # Auto Base模式：复用同一个workbook，避免重复打开/关闭
+                wb, sheetnames = self.create_excel_workbook(Chpath, C, reset_file=True)
 
-            # 6. 创建Excel工作簿和工作表
-            wb, sheetnames = self.create_excel_workbook(Chpath, C)
-            self.currenttime = datetime.datetime.now()
-            self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
+                # 第一次：完整执行原始流程
+                self.GuiRefresh(self.Status, 'Pass 1/2: Original Processing')
+                rng_lcol = self.run_processing_pass(
+                    Chvalues, Ch, C, Chpath, Tempvalue, Temptitle, expInfo,
+                    n, wn, m, datarange, wave, ringwords, diffwords, timearr, cycleNoarr,
+                    wb=wb, sheetnames=sheetnames, close_wb=False
+                )
 
-            # 7. 写入时间和标题
-            self.write_time_and_headers(wb, sheetnames, timearr, cycleNoarr)
-            self.currenttime = datetime.datetime.now()
-            self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
+                # 基于时间分段自动生成基准配置（不写备注文件，直接内存传递）
+                baseline_cycle, segment_points = self.build_auto_baseline_info(timearr, gap_minutes=1.0)
+                expInfo_auto = self.merge_expinfo_with_auto_baseline(expInfo, baseline_cycle)
 
-            # 8. 处理温度数据插值
-            yinterp = self.process_temperature_interpolation(wb, sheetnames, timearr, cycleNoarr, Tempvalue, Temptitle)
-            self.currenttime = datetime.datetime.now()
-            self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
+                # 第二次：仅输出自动基准吸光度两张sheet并绘图
+                self.GuiRefresh(self.Status, 'Pass 2/2: Auto Base + Charts')
+                all_singleabsarr, all_diffabsarr = self.calculate_auto_absorbance_arrays(
+                    Chvalues, Ch, n, wn, m, datarange, timearr, expInfo_auto
+                )
+                auto_single, auto_diff = self.write_auto_absorbance_sheets(
+                    wb, sheetnames, C, wave, ringwords, diffwords,
+                    timearr, cycleNoarr, all_singleabsarr, all_diffabsarr
+                )
+                self.write_segment_points_sheet(wb, segment_points, C)
 
-            # 9. 写入汇总数据标题
-            self.write_summary_data(wb, sheetnames, wave, ringwords, diffwords, Ch, C)
+                auto_sheetnames = list(sheetnames)
+                auto_sheetnames[1] = auto_single
+                auto_sheetnames[4] = auto_diff
+                self.create_charts(wb, auto_sheetnames, timearr, wave, Ch, wn, rng_lcol, expInfo_auto, Chpath, C)
 
-            # 10. 处理单环数据（支持多基准周期）
-            self.process_single_ring_data(wb, sheetnames, Chvalues, Ch, ringwords, wave, datarange, basesingle_dict, n, wn, m, timearr, expInfo)
+                # 自动基准sheet命名提升并与原始sheet互换位置
+                self.promote_autobase_absorbance_sheets(wb, sheetnames, C)
+                wb.close()
+                wb = None
+            else:
+                # 默认：单次原始流程
+                self.run_processing_pass(
+                    Chvalues, Ch, C, Chpath, Tempvalue, Temptitle, expInfo,
+                    n, wn, m, datarange, wave, ringwords, diffwords, timearr, cycleNoarr,
+                    reset_file=True
+                )
 
-            # 11. 处理差分数据（支持多基准周期）
-            self.process_differential_data(wb, sheetnames, Chvalues, Ch, diffwords, wave, datarange, basediff_dict, n, wn, m, timearr, expInfo)
-
-            # 12. 处理动态基准周期
-            self.handle_dynamic_base_cycle(wb, sheetnames, Ch, n, wn, C)
-
-            # 13. 添加备注数据并计算梯度
-            self.add_info_data(wb, sheetnames, expInfo, timearr)
-            self.add_gradient_data(wb, sheetnames, expInfo, timearr, C, diffwords, wave)
-
-            # 14. 添加血糖数据
-            rng_lcol = self.add_glucose_data(wb, sheetnames, timearr, yinterp, C, expInfo=expInfo)
-
-            # 15. 创建图表
-            self.create_charts(wb, sheetnames, timearr, wave, Ch, wn, rng_lcol, expInfo, Chpath, C)
-
-            # 16. 最终保存和清理
-            wb.close()
             self.GuiRefresh(self.Status, 'Process Finished')
-            self.Process.setEnabled(True)
             self.currenttime = datetime.datetime.now()
             self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
 
@@ -1629,12 +2090,14 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             lineno = exc_tb.tb_lineno
             self.GuiRefresh(self.ErrorText, f"出错位置: 文件 {fname}, 第 {lineno} 行")
 
-            self.Process.setEnabled(True)
             try:
-                wb.save()
-                wb.close()
+                if wb is not None:
+                    wb.save()
+                    wb.close()
             except Exception:
                 pass
+        finally:
+            self.Process.setEnabled(True)
 
     def _create_individual_charts(self, wb, sheetnames, charttitles, ringsindex, tempindex, infoindex,
                                   wave, Ch, wn, timearr, expInfo, Chpath, C, rng_lcol, pltN, SRRange,
@@ -1715,7 +2178,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 waveIndex1, waveIndex2 = wave.index(wave1) + 1, wave.index(wave2) + 1
 
                 targets = ['Diff12', 'Diff23', 'Diff34', 'Diff35', 'Diff45']
-                if self.ClassicCheckBox.isChecked():
+                if self.classicCheckBox.isChecked():
                     targets.remove(targets[3])  # 经典模式关闭Diff35
 
                 sheet_target = wb.sheets[sheetnames[4]]
@@ -2190,7 +2653,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             textbox.TextFrame2.TextRange.Characters.Font.Bold = 1
             textbox.Placement = xw.constants.Placement.xlFreeFloating
 
-            if self.ClassicCheckBox.isChecked():
+            if self.classicCheckBox.isChecked():
                 textbox.Top = 200 + self.CHART_TOP + self.CHART_HEIGHT * 3
                 textbox.Left = self.CHART_LEFT + 3.5 * self.CHART_WIDTH
 

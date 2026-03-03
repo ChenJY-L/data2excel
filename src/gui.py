@@ -124,11 +124,17 @@ class Ui_Data_Processing(object):
         self.duplicateCheckBox.setChecked(False)
         self.duplicateCheckBox.setObjectName("duplicateCheckBox")
 
-        self.ClassicCheckBox = QtWidgets.QCheckBox(self.optionsGroup)
-        self.ClassicCheckBox.setGeometry(QtCore.QRect(515, 55, 100, 25))
-        self.ClassicCheckBox.setFont(font)
-        self.ClassicCheckBox.setChecked(False)
-        self.ClassicCheckBox.setObjectName("ClassicCheckBox")
+        self.classicCheckBox = QtWidgets.QCheckBox(self.optionsGroup)
+        self.classicCheckBox.setGeometry(QtCore.QRect(515, 25, 100, 25))
+        self.classicCheckBox.setFont(font)
+        self.classicCheckBox.setChecked(False)
+        self.classicCheckBox.setObjectName("ClassicCheckBox")
+
+        self.autoSetBaseCheckBox = QtWidgets.QCheckBox(self.optionsGroup)
+        self.autoSetBaseCheckBox.setGeometry(QtCore.QRect(515, 55, 100, 25))
+        self.autoSetBaseCheckBox.setFont(font)
+        self.autoSetBaseCheckBox.setChecked(False)
+        self.autoSetBaseCheckBox.setObjectName("autoSetBaseCheckBox")
 
         # ==================== 参数设置组 ====================
         self.parametersGroup = QtWidgets.QGroupBox(Data_Processing)
@@ -152,13 +158,13 @@ class Ui_Data_Processing(object):
 
         # ==================== 控制组 ====================
         self.controlGroup = QtWidgets.QGroupBox(Data_Processing)
-        self.controlGroup.setGeometry(QtCore.QRect(350, 210, 290, 60))
+        self.controlGroup.setGeometry(QtCore.QRect(300, 210, 340, 60))
         self.controlGroup.setFont(font)
         self.controlGroup.setObjectName("controlGroup")
 
         # 处理按钮
         self.Process = QtWidgets.QPushButton(self.controlGroup)
-        self.Process.setGeometry(QtCore.QRect(180, 20, 100, 30))
+        self.Process.setGeometry(QtCore.QRect(220, 20, 100, 30))
         process_font = QtGui.QFont()
         process_font.setFamily("Calibri")
         process_font.setPointSize(12)
@@ -175,7 +181,7 @@ class Ui_Data_Processing(object):
 
         self.Status = QtWidgets.QTextEdit(self.controlGroup)
         # self.Status.setEnabled(False)
-        self.Status.setGeometry(QtCore.QRect(65, 25, 110, 25))
+        self.Status.setGeometry(QtCore.QRect(55, 25, 155, 25))
         status_font = QtGui.QFont()
         status_font.setFamily("Calibri")
         status_font.setPointSize(9)
@@ -234,7 +240,8 @@ class Ui_Data_Processing(object):
         self.gradientCheckBox.setText(_translate("Data_Processing", "Gradient"))
         self.tempCorrelationCheckBox.setText(_translate("Data_Processing", "Temp Corr"))
         self.duplicateCheckBox.setText(_translate("Data_Processing", "Duplicate"))
-        self.ClassicCheckBox.setText(_translate("Data_Processing", "Classic Mode"))
+        self.classicCheckBox.setText(_translate("Data_Processing", "Classic Mode"))
+        self.autoSetBaseCheckBox.setText(_translate("Data_Processing", "Auto Base"))
 
         self.BaseCycleLabel.setText(_translate("Data_Processing", "Base Cycle:"))
 
