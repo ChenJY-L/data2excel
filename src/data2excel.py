@@ -86,6 +86,16 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         "ignore_series": [[], [], [2,3,4], [], []]
     }
 
+    # 绘图后追加目标系列（默认关闭）
+    # target_id 支持示例: Diff12 / Ring3 / 3环 / Ch3 / 3
+    CHART_TARGET_OVERLAY = {
+        "enabled": True,
+        "chart_key": "Diff45",
+        "wavelength": "1550",
+        "target_id": "Diff35",
+        "color": "#FFC000",
+    }
+
     def __init__(self, parent=None):
         """
         初始化GUI界面
@@ -2422,6 +2432,23 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 self.AXIS_FONT_SIZE -= 6
                 self.AXIS_TITLE_FONT_SIZE -= 6
 
+                # 在复制图完成后，再按配置追加主坐标轴目标系列
+                overlay_cfg = self.CHART_TARGET_OVERLAY
+                if overlay_cfg.get("enabled"):
+                    chart_key = str(overlay_cfg.get("chart_key", "")).strip()
+                    if chart_key == "" or chart_key == each:
+                        self._add_target_series_to_main_axis(
+                            wavelength=overlay_cfg.get("wavelength"),
+                            target_id=overlay_cfg.get("target_id"),
+                            color=overlay_cfg.get("color"),
+                            chartApi=duplicated_chart.Chart,
+                            wave=wave,
+                            Ch=Ch,
+                            SRRange=SRRange,
+                            diffSheet=diffSheet,
+                            sglSheet=sglSheet
+                        )
+
             # 更新UI
             self.currenttime = datetime.datetime.now()
             self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
@@ -2433,6 +2460,125 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         # self.create_refresh_button(wb, sheetnames, expInfo)
         self.GuiRefresh(self.Status, 'Saving...')
         wb.save()
+
+    def _resolve_target_series_info(self, wavelength, target_id, wave, Ch, SRRange, diffSheet, sglSheet):
+        """
+        解析目标系列，返回可直接用于图表系列添加的信息。
+
+        Args:
+            wavelength: 目标波长（例如 '1050'）
+            target_id: 目标ID（例如 'Diff12' 或 'Ring3'）
+            wave: 当前可用波长列表
+            Ch: 环数
+            SRRange: 查找范围
+            diffSheet: 差分sheet
+            sglSheet: 单环sheet
+
+        Returns:
+            dict | None: {'name': str, 'x_range': Range, 'y_range': Range}
+        """
+        if wavelength is None or target_id is None:
+            return None
+
+        wave_key = str(wavelength).strip()
+        target_key = str(target_id).strip()
+        if wave_key == '' or target_key == '':
+            return None
+        if wave_key not in wave:
+            return None
+
+        wave_index = wave.index(wave_key) + 1
+        target_upper = target_key.upper()
+
+        # 差分目标：Diff12
+        if target_upper.startswith("DIFF"):
+            match = re.search(r'(\d+)\s*(\d+)$', target_key)
+            if match:
+                diff_id = f"Diff{match.group(1)}{match.group(2)}"
+            else:
+                compact = target_key.replace(' ', '')
+                digits = re.sub(r'(?i)^diff', '', compact)
+                if not re.fullmatch(r'\d{2,}', digits):
+                    return None
+                diff_id = f"Diff{digits}"
+
+            addr = int(self.FindRowColRange(diffSheet, 'Col', diff_id, SRRange))
+            if addr <= 0:
+                return None
+
+            col_index = addr + wave_index
+            col_letter = xw.utils.col_name(col_index)
+            last_row = diffSheet.used_range.last_cell.row
+            return {
+                "name": f"{diff_id} {wave_key}",
+                "x_range": diffSheet.range(f"A3:A{last_row}"),
+                "y_range": diffSheet.range(f"{col_letter}3:{col_letter}{last_row}")
+            }
+
+        # 单环目标：Ring3 / 3环 / Ch3 / 3
+        match = re.search(r'(\d+)\s*$', target_key)
+        if not match:
+            return None
+
+        ring_num = int(match.group(1))
+        if ring_num < 1 or ring_num > Ch:
+            return None
+
+        addr = int(self.FindRowColRange(sglSheet, 'Col', wave_key, SRRange))
+        if addr <= 0:
+            return None
+
+        col_index = addr + 7 * (ring_num - 1)
+        col_letter = xw.utils.col_name(col_index)
+        last_row = sglSheet.used_range.last_cell.row
+        return {
+            "name": f"{wave_key} Ring{ring_num}",
+            "x_range": sglSheet.range(f"A3:A{last_row}"),
+            "y_range": sglSheet.range(f"{col_letter}3:{col_letter}{last_row}")
+        }
+
+    def _add_target_series_to_main_axis(self, wavelength, target_id, color, chartApi, wave, Ch, SRRange, diffSheet, sglSheet):
+        """
+        在主坐标轴上追加一个目标系列。
+
+        Args:
+            wavelength: 目标波长
+            target_id: 差分ID或单环ID
+            color: 系列颜色（十六进制字符串，如 #FFC000）
+            chartApi: 目标图表句柄（chart.api[1]）
+            wave, Ch, SRRange, diffSheet, sglSheet: 数据定位所需上下文
+
+        Returns:
+            bool: 添加成功返回True，否则False
+        """
+        target_info = self._resolve_target_series_info(
+            wavelength=wavelength,
+            target_id=target_id,
+            wave=wave,
+            Ch=Ch,
+            SRRange=SRRange,
+            diffSheet=diffSheet,
+            sglSheet=sglSheet
+        )
+        if target_info is None:
+            return False
+
+        new_series = chartApi.SeriesCollection().NewSeries()
+        new_series.Name = target_info["name"]
+        new_series.XValues = target_info["x_range"].api
+        new_series.Values = target_info["y_range"].api
+        new_series.AxisGroup = 1
+        new_series.Format.Line.Weight = self.LINE_WEIGHT
+        try:
+            target_color = self.hexColor2Int(str(color))
+        except Exception:
+            target_color = self.hexColor2Int("#FFC000")
+        new_series.Format.Line.ForeColor.RGB = target_color
+        new_series.MarkerStyle = 8
+        new_series.MarkerSize = 5
+        new_series.MarkerBackgroundColor = target_color
+        new_series.MarkerForegroundColor = target_color
+        return True
 
     def _configure_chart_appearance(self,
                                     chartApi,
