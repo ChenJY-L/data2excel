@@ -81,9 +81,16 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
     """
     用于设置复制放大的chart的id和需要忽略的chart
     """
+    # 经典模式的复制目标
+    # Duplicate_Target = {
+    #     "index": [2, 10, 5, 8, 11],
+    #     "ignore_series": [[], [], [2,3,4], [], []]
+    # }
+
+    # 新模式的复制目标
     Duplicate_Target = {
-        "index": [2, 10, 5, 8, 11],
-        "ignore_series": [[], [], [2,3,4], [], []]
+        "index": [2, 10, 9, 11, 8,],         # sing1050, sing1550, diff1050, diff1550, diff1550-1050
+        "ignore_series": [[], [], [], [], [],]
     }
 
     # 绘图后追加目标系列（默认关闭）
@@ -1728,31 +1735,31 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                        '1050nm单环吸光度vs.测头下实际温度', '1219nm单环吸光度',
                        '34环差分信号vs.加热功率', '45环差分信号vs.测头相对扶手高度(cm)',
                        '1314nm单环吸光度', '1409nm单环吸光度',
-                       'Diff1550-Diff1050', '1050nm差分吸光度vs.测头下实际温度',
-                       '1550nm单环吸光度', '1609nm单环吸光度']
+                       'Diff1550-Diff1050', '1050nm差分吸光度',
+                       '1550nm单环吸光度', '1550nm差分吸光度', '1609nm单环吸光度']
 
         ringsindex = ['Diff12', 'Diff23', '1050', '1219',
                       'Diff34', 'Diff45', '1314', '1409',
-                      'Diff1550-Diff1050', 'Diff1050', '1550', '1609']
+                      'Diff1550-Diff1050', 'Diff1050', '1550', 'Diff1550', '1609']
 
         if self.TempCheckBox.isChecked():
             tempindex = ['4', '5', '12', '0',
                          '15', '33', '0', '0',
-                         '0', '12', '15', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
+                         '0', '0', '15', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
         else:
             tempindex = ['0', '0', '0', '0',
                          '0', '0', '0', '0',
-                         '0', '0', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
+                         '0', '0', '0', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
 
         if self.classicCheckBox.isChecked():
             tempindex = ['4', '5', '0', '0',
                          '15', '0', '0', '0',
-                         '0', '12', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
+                         '0', '12', '0', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
             charttitles[2] = '1050nm单环吸光度'
 
         infoindex = [False, False, False, False,
                      True, True, True, True,
-                     False, False, False, False]
+                     False, False, False, False, False]
 
         if self.OGTTCheckBox.isChecked():  # OGTT时的血糖值绘制准备
             # tempindex[5] = str(rng_lcol + 2)
@@ -1761,15 +1768,10 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             charttitles[8] = charttitles[8] + ' vs.血糖值'
 
         if self.tempCorrelationCheckBox.isChecked():
-            charttitles[11] = '温度校正后的波长差分'
-            ringsindex[11] = 'Diff1550-Diff1050-temp'
-            tempindex[11] = '0'
+            charttitles[-1] = '温度校正后的波长差分'
+            ringsindex[-1] = 'Diff1550-Diff1050-temp'
+            tempindex[-1] = '0'
 
-            if self.classicCheckBox.isChecked():
-                charttitles.append('1609nm单环吸光度')
-                ringsindex.append('1609')
-                tempindex.append('0')
-                
             charttitles.append('1609nm单环吸光度')
             ringsindex.append('1609')
             tempindex.append('0')
