@@ -144,17 +144,31 @@ class Ui_Data_Processing(object):
 
         # 基准周期标签和输入框
         self.BaseCycleLabel = QtWidgets.QLabel(self.parametersGroup)
-        self.BaseCycleLabel.setGeometry(QtCore.QRect(10, 25, 80, 25))
+        self.BaseCycleLabel.setGeometry(QtCore.QRect(10, 10, 80, 25))
         self.BaseCycleLabel.setFont(font)
         self.BaseCycleLabel.setObjectName("BaseCycleLabel")
 
         self.BaseCycle = QtWidgets.QSpinBox(self.parametersGroup)
-        self.BaseCycle.setGeometry(QtCore.QRect(100, 25, 80, 25))
+        self.BaseCycle.setGeometry(QtCore.QRect(100, 10, 80, 20))
         self.BaseCycle.setFont(font)
         self.BaseCycle.setMinimum(1)
         self.BaseCycle.setMaximum(99999999)
         self.BaseCycle.setProperty("value", 1)
         self.BaseCycle.setObjectName("BaseCycle")
+
+        # AutoBase阈值
+        self.AutoBaseThreshLabel = QtWidgets.QLabel(self.parametersGroup)
+        self.AutoBaseThreshLabel.setGeometry(QtCore.QRect(10, 30, 80, 25))
+        self.AutoBaseThreshLabel.setFont(font)
+        self.AutoBaseThreshLabel.setObjectName("AutoBaseThreshLabel")
+
+        self.AutoBaseThresh = QtWidgets.QSpinBox(self.parametersGroup)
+        self.AutoBaseThresh.setGeometry(QtCore.QRect(100, 30, 80, 20))
+        self.AutoBaseThresh.setFont(font)
+        self.AutoBaseThresh.setMinimum(20)
+        self.AutoBaseThresh.setMaximum(1000)
+        self.AutoBaseThresh.setProperty("value", 1)
+        self.AutoBaseThresh.setObjectName("AutoBaseThresh")
 
         # ==================== 控制组 ====================
         self.controlGroup = QtWidgets.QGroupBox(Data_Processing)
@@ -244,6 +258,7 @@ class Ui_Data_Processing(object):
         self.autoSetBaseCheckBox.setText(_translate("Data_Processing", "Auto Base"))
 
         self.BaseCycleLabel.setText(_translate("Data_Processing", "Base Cycle:"))
+        self.AutoBaseThreshLabel.setText(_translate("Data_Processing", "Thresh(s):"))
 
         self.Process.setText(_translate("Data_Processing", "Process"))
         self.StatusLabel.setText(_translate("Data_Processing", "Status:"))

@@ -2054,7 +2054,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 )
 
                 # 基于时间分段自动生成基准配置（不写备注文件，直接内存传递）
-                baseline_cycle, segment_points = self.build_auto_baseline_info(timearr, gap_minutes=1.0)
+                baseline_cycle, segment_points = self.build_auto_baseline_info(timearr, gap_minutes=float(self.AutoBaseThresh.value()) / 60)
                 expInfo_auto = self.merge_expinfo_with_auto_baseline(expInfo, baseline_cycle)
 
                 # 第二次：仅输出自动基准吸光度两张sheet并绘图
