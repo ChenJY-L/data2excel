@@ -2054,9 +2054,9 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                     timearr, cycleNoarr, all_singleabsarr, all_diffabsarr
                 )
                 segment_points.insert(0, {
-                "cycle": int(0),
-                "time": timearr[0],
-                "gap_minutes": float(0),
+                "cycle": 1,
+                "time": timearr[0].item(),
+                "gap_minutes": 0.0,
                 })
                 self.write_segment_points_sheet(wb, segment_points, C)
 
