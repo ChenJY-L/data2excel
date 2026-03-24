@@ -1442,7 +1442,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         """
         1. 复制sheet差分吸光度中的Diff1550-1050的数据到这个sheet中
         2. 填写公式，在复制后的数据的第一列为周期（至少会使用两个点）
-        3. 使用填写的周期计算斜率，并让Diff1550-1050减去这个斜率
+        3. 使用填写的周期计算线性项 y = k*t + b，并让Diff1550-1050减去该线性项
         4. 插入一个sheet，保持绘图风格
 
         Args:
@@ -1501,8 +1501,10 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         raw_start_col = 3
         corrected_start_col = raw_start_col + len(targets) + 1
         slope_summary_start_col = corrected_start_col + len(targets) + 2
+        intercept_summary_start_col = slope_summary_start_col + len(targets) + 2
 
         grad_sheet.range(1, slope_summary_start_col - 1).value = '斜率' if C else 'Slope'
+        grad_sheet.range(1, intercept_summary_start_col - 1).value = '截距' if C else 'Intercept'
         plotted_targets = []
 
         for idx, target in enumerate(targets):
@@ -1515,10 +1517,12 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             raw_col = raw_start_col + idx
             corrected_col = corrected_start_col + idx
             slope_col = slope_summary_start_col + idx
+            intercept_col = intercept_summary_start_col + idx
             plotted_targets.append((target, corrected_col))
             raw_col_letter = xw.utils.col_name(raw_col)
             corrected_col_letter = xw.utils.col_name(corrected_col)
             slope_col_letter = xw.utils.col_name(slope_col)
+            intercept_col_letter = xw.utils.col_name(intercept_col)
             raw_range = f'{raw_col_letter}{data_row}:{raw_col_letter}{target_last_row}'
             corrected_range = f'{corrected_col_letter}{data_row}:{corrected_col_letter}{target_last_row}'
             cycle_range = f'$B${data_row}:$B${target_last_row}'
@@ -1530,9 +1534,10 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             )
 
             grad_sheet.range(3, corrected_col).value = target + '1550-1050'
-            grad_sheet.range(4, corrected_col).value = '扣斜率后' if C else 'Corrected'
+            grad_sheet.range(4, corrected_col).value = '扣k*t+b后' if C else 'Minus k*t+b'
             grad_sheet.range(corrected_range).formula = (
-                f'=IFERROR({raw_col_letter}{data_row}-${slope_col_letter}$2*($B{data_row}-$B$2),{raw_col_letter}{data_row})'
+                f'=IFERROR({raw_col_letter}{data_row}-(${slope_col_letter}$2*$B{data_row}+${intercept_col_letter}$2),'
+                f'{raw_col_letter}{data_row})'
             )
 
             grad_sheet.range(1, slope_col).value = target
@@ -1541,6 +1546,12 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 f'INDEX({raw_range},MATCH($C$2,{cycle_range},0))-'
                 f'INDEX({raw_range},MATCH($B$2,{cycle_range},0))'
                 f')/($C$2-$B$2),0)'
+            )
+            grad_sheet.range(1, intercept_col).value = target
+            grad_sheet.range(2, intercept_col).formula = (
+                f'=IFERROR('
+                f'INDEX({raw_range},MATCH($B$2,{cycle_range},0))-'
+                f'${slope_col_letter}$2*$B$2,0)'
             )
 
         grad_sheet.api.Columns("A:A").NumberFormatLocal = "[$-x-systime]h:mm:ss AM/PM"
@@ -1575,7 +1586,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 series.MarkerSize = 5
                 series.Format.Line.Weight = self.LINE_WEIGHT
 
-            chart_title = '扣斜率后Diff1550-Diff1050' if C else 'Gradient Corrected Diff1550-Diff1050'
+            chart_title = '扣k*t+b后Diff1550-Diff1050' if C else 'Diff1550-Diff1050 Minus k*t+b'
             self._configure_chart_appearance(chartApi, chart_title, 'ΔAd', 0, wb, sheetnames, 0)
 
         wb.save()
