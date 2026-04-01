@@ -740,7 +740,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         for start in segment_starts:
             baseline_cycle.append({
                 "time": float(time_flat[start] % 1.0),
-                "value": int(start + 1),
+                "value": int(start + 1) + 1,
             })
 
         segment_points = []
