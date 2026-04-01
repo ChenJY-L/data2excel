@@ -165,7 +165,7 @@ class Ui_Data_Processing(object):
         self.AutoBaseThresh = QtWidgets.QSpinBox(self.parametersGroup)
         self.AutoBaseThresh.setGeometry(QtCore.QRect(100, 30, 80, 20))
         self.AutoBaseThresh.setFont(font)
-        self.AutoBaseThresh.setMinimum(20)
+        self.AutoBaseThresh.setMinimum(10)
         self.AutoBaseThresh.setMaximum(1000)
         self.AutoBaseThresh.setProperty("value", 1)
         self.AutoBaseThresh.setObjectName("AutoBaseThresh")
