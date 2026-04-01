@@ -1744,7 +1744,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         if self.TempCheckBox.isChecked():
             tempindex = ['4', '5', '12', '0',
                          '15', '33', '0', '0',
-                         '0', '0', '15', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
+                         '0', '33', '15', '33', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
         else:
             tempindex = ['0', '0', '0', '0',
                          '0', '0', '0', '0',
@@ -1761,9 +1761,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                      False, True, False, True, False]
 
         if self.OGTTCheckBox.isChecked():  # OGTT时的血糖值绘制准备
-            # tempindex[5] = str(rng_lcol + 2)
             tempindex[8] = str(rng_lcol + 2)
-            # charttitles[5] = '45环差分信号vs.血糖真值'
             charttitles[8] = charttitles[8] + ' vs.血糖值'
 
         if self.tempCorrelationCheckBox.isChecked():
@@ -2300,17 +2298,6 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                     secrange = tempSheet.range(SecRangeS)
 
             self.GuiRefresh(self.Status, 'Plotting ' + str(p + 1) + '/' + str(pltN))
-
-            # 计算图表位置 - 为了解决diff1050和diff1550-diff1050绘图位置的问题
-            # if len(each) <= 8:
-            #     figure_lft = self.CHART_LEFT + self.CHART_WIDTH * int(p % 4)
-            #     figure_top = self.CHART_TOP + self.CHART_HEIGHT * int(p / 4)
-            #     figure_height = self.CHART_HEIGHT
-            # else:
-            #     # len(each) >= 8的情况，图表位置需要特殊处理
-            #     figure_lft = self.CHART_LEFT + self.CHART_WIDTH * int(p % 4)
-            #     figure_top = self.CHART_TOP + self.CHART_HEIGHT * int(p / 4)
-            #     figure_height = self.CHART_HEIGHT
 
             figure_lft = (self.CHART_LEFT + self.CHART_WIDTH * int(p % 4))
             figure_top = (self.CHART_TOP + self.CHART_HEIGHT * int(p / 4))
