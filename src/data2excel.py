@@ -81,17 +81,11 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
     """
     用于设置复制放大的chart的id和需要忽略的chart
     """
-    # 经典模式的复制目标
-    # Duplicate_Target = {
-    #     "index": [2, 10, 5, 8, 11],
-    #     "ignore_series": [[], [], [2,3,4], [], []]
-    # }
-
-    # 新模式的复制目标
-    Duplicate_Target = {
-        "index": [2, 10, 9, 11, 8,],         # sing1050, sing1550, diff1050, diff1550, diff1550-1050
-        "ignore_series": [[], [], [], [], [],],
-        "delete_original": [False, False, False, True, False, False],
+    duplicate_target = {
+        "index": [2, 3, 10, 9, 12, 11, 8,],         # 1050, 1219, 1550, diff1050, diff1219, diff1550, diff1550-1050
+        "ignore_series": [[], [], [], [], [], [], []],
+        "delete_original": [False, False, False, False, True, True, False],
+        "row": [1, 1, 2, 3, 2, 4, 5],
     }
 
     # 绘图后追加目标系列（默认关闭）
@@ -899,7 +893,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         """
         try:
             yinterp = np.empty((timearr.shape[0], Tempvalue.shape[1] - 1))
-        except:
+        except (AttributeError, TypeError, IndexError):
             yinterp = np.empty((timearr.shape[0], 1))
 
         if self.TempCheckBox.isChecked():
@@ -1735,30 +1729,27 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                        '34环差分信号vs.加热功率', '45环差分信号vs.测头相对扶手高度(cm)',
                        '1314nm单环吸光度', '1409nm单环吸光度',
                        'Diff1550-Diff1050', '1050nm差分吸光度',
-                       '1550nm单环吸光度', '1550nm差分吸光度', '1609nm单环吸光度']
+                       '1550nm单环吸光度', '1550nm差分吸光度', '1219nm差分吸光度', '1609nm单环吸光度']
 
         ringsindex = ['Diff12', 'Diff23', '1050', '1219',
                       'Diff34', 'Diff45', '1314', '1409',
-                      'Diff1550-Diff1050', 'Diff1050', '1550', 'Diff1550', '1609']
+                      'Diff1550-Diff1050', 'Diff1050', '1550', 'Diff1550', 'Diff1219', '1609']
 
         if self.TempCheckBox.isChecked():
             tempindex = ['4', '5', '12', '0',
                          '15', '33', '0', '0',
-                         '0', '33', '15', '33', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
+                         '0', '33', '15', '33', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
         else:
-            tempindex = ['0', '0', '0', '0',
-                         '0', '0', '0', '0',
-                         '0', '0', '0', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
-
+            tempindex = ['0'] * len(ringsindex)
         if self.classicCheckBox.isChecked():
             tempindex = ['4', '5', '0', '0',
                          '15', '0', '0', '0',
-                         '0', '12', '0', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
+                         '0', '12', '0', '0', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
             charttitles[2] = '1050nm单环吸光度'
 
         infoindex = [False, False, False, False,
                      True, True, True, True,
-                     False, True, False, True, False]
+                     False, True, False, True, False, False]
 
         if self.OGTTCheckBox.isChecked():  # OGTT时的血糖值绘制准备
             tempindex[8] = str(rng_lcol + 2)
@@ -2408,15 +2399,20 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 self._add_experiment_annotations(chartApi, expInfo, timearr, p, secondary_axis_series_count)
 
             # 图表复制并放大
-            if self.duplicateCheckBox.isChecked() and p in self.Duplicate_Target["index"]:
-                duplicate_index = self.Duplicate_Target["index"].index(p)
+            if self.duplicateCheckBox.isChecked() and p in self.duplicate_target["index"]:
+                duplicate_index = self.duplicate_target["index"].index(p)
+                dup_row = self.duplicate_target["row"][duplicate_index] - 1
                 duplicated_chart = chartApi.Parent.Duplicate()
-                duplicated_chart.Top = 200 + self.CHART_TOP + self.CHART_HEIGHT*3 + duplicate_index*0.85*self.CHART_HEIGHT
+                duplicated_chart.Top = 200 + self.CHART_TOP + self.CHART_HEIGHT*3 + dup_row*0.85*self.CHART_HEIGHT
                 duplicated_chart.Left = self.CHART_LEFT + self.CHART_WIDTH
                 duplicated_chart.Width = 2.5 * self.CHART_WIDTH
                 duplicated_chart.Height = 0.85 * self.CHART_HEIGHT
 
-                for ignore_index in self.Duplicate_Target["ignore_series"][duplicate_index]:
+                if each == '1219' or each == 'Diff1219':
+                    duplicated_chart.Width = self.CHART_WIDTH
+                    duplicated_chart.Left = duplicated_chart.Left + 2.5 * self.CHART_WIDTH
+
+                for ignore_index in self.duplicate_target["ignore_series"][duplicate_index]:
                     duplicated_chart.Chart.FullSeriesCollection(ignore_index).IsFiltered = True
 
                 self.AXIS_FONT_SIZE += 6
@@ -2426,7 +2422,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 self.AXIS_TITLE_FONT_SIZE -= 6
 
                 # 删除原始图（可选）
-                if self.Duplicate_Target["delete_original"][duplicate_index]:
+                if self.duplicate_target["delete_original"][duplicate_index]:
                     chartApi.Parent.Delete()
 
                 # 在复制图完成后，再按配置追加主坐标轴目标系列
