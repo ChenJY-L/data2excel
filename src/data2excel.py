@@ -46,6 +46,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
     """
 
     # ==================== 类配置变量 ====================
+    COR1219 = 3
 
     # 图表绘制配置
     CHART_LEFT = 400        # 图表左距
@@ -82,10 +83,10 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
     用于设置复制放大的chart的id和需要忽略的chart
     """
     duplicate_target = {
-        "index": [2, 3, 10, 9, 12, 11, 8,],         # 1050, 1219, 1550, diff1050, diff1219, diff1550, diff1550-1050
-        "ignore_series": [[], [], [], [], [], [], []],
-        "delete_original": [False, False, False, False, True, True, False],
-        "row": [1, 1, 2, 3, 2, 4, 5],
+        "index": [2, 3, 10, 9, 12, 11, 8, 14],         # 1050, 1219, 1550, diff1050, diff1219, diff1550, diff1550-1050
+        "ignore_series": [[], [], [], [], [], [], [], []],
+        "delete_original": [False, False, False, False, True, True, False, True],
+        "row": [1, 1, 2, 3, 2, 4, 5, 6],
     }
 
     # 绘图后追加目标系列（默认关闭）
@@ -1719,16 +1720,17 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                        '34环差分信号vs.加热功率', '45环差分信号vs.测头相对扶手高度(cm)',
                        '1314nm单环吸光度', '1409nm单环吸光度',
                        'Diff1550-Diff1050', '1050nm差分吸光度',
-                       '1550nm单环吸光度', '1550nm差分吸光度', '1219nm差分吸光度', '1609nm单环吸光度']
+                       '1550nm单环吸光度', '1550nm差分吸光度', '1219nm差分吸光度', '1609nm单环吸光度', 'Diff1550-1050-k×1219']
 
         ringsindex = ['Diff12', 'Diff23', '1050', '1219',
                       'Diff34', 'Diff45', '1314', '1409',
-                      'Diff1550-Diff1050', 'Diff1050', '1550', 'Diff1550', 'Diff1219', '1609']
+                      'Diff1550-Diff1050', 'Diff1050', '1550',
+                      'Diff1550', 'Diff1219', '1609', 'Diff1550-Diff1050-kDiff1219']
 
         if self.TempCheckBox.isChecked():
             tempindex = ['4', '5', '12', '0',
                          '15', '33', '0', '0',
-                         '0', '33', '15', '33', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
+                         '0', '33', '15', '33', '0', '0', '33']  # 对应sheet中的列，设置为0则不设置副坐标轴
         else:
             tempindex = ['0'] * len(ringsindex)
         if self.classicCheckBox.isChecked():
@@ -1739,16 +1741,17 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
         infoindex = [False, False, False, False,
                      True, True, True, True,
-                     False, True, False, True, False, False]
+                     False, True, False, True, False, False, True]
 
         if self.OGTTCheckBox.isChecked():  # OGTT时的血糖值绘制准备
             tempindex[8] = str(rng_lcol + 2)
             charttitles[8] = charttitles[8] + ' vs.血糖值'
 
         if self.tempCorrelationCheckBox.isChecked():
-            charttitles[-1] = '温度校正后的波长差分'
-            ringsindex[-1] = 'Diff1550-Diff1050-temp'
-            tempindex[-1] = '0'
+            replace_index = ringsindex.index('1609')
+            charttitles[replace_index] = '温度校正后的波长差分'
+            ringsindex[replace_index] = 'Diff1550-Diff1050-temp'
+            tempindex[replace_index] = '0'
 
             charttitles.append('1609nm单环吸光度')
             ringsindex.append('1609')
@@ -2250,6 +2253,19 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
                         # 组合公式
                         formula = f"=${addr1}2-${addr2}2+${temp_corr_addr}$2*({temp_addr}-{base_temp_addr})"
+                    elif len(each) == len('Diff1550-Diff1050-kDiff1219'):
+                        """
+                        设置接口矫正模型
+                        公式: $ Diff1550 - Diff1050 - k \cdot Diff1219$
+                        """
+                        waveIndex3 = 2
+                        addr3 = xw.utils.col_name(base_addr + waveIndex3)
+                        corr_addr = xw.utils.col_name(last_col + len(targets) + 2)
+                        sheet_target.range(xw.utils.col_name(last_col + 1) + '1').value = ' '
+                        sheet_target.range(corr_addr + '2').value = '矫正系数'
+                        sheet_target.range(corr_addr + '3').value = self.COR1219
+
+                        formula = f"=${addr1}2-${addr2}2-${corr_addr}$3*${addr3}2"
 
                     # 填充整个列（从 2 到最后一行）
                     sheet_target.range(f"{indice}2:{indice}{datasheet.used_range.last_cell.row}").formula = formula
