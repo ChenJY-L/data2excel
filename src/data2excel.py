@@ -84,6 +84,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
     """
     duplicate_target = {
         "index": [2, 3, 10, 9, 12, 11, 8, 14],         # 1050, 1219, 1550, diff1050, diff1219, diff1550, diff1550-1050
+        "name": ['1050', '1219', '1550', 'Diff1050', 'Diff1219', 'Diff1550', 'Diff1550-Diff1050', 'Diff1550-Diff1050-kDiff1219'],
         "ignore_series": [[], [], [], [], [], [], [], []],
         "delete_original": [False, False, False, False, True, True, False, True],
         "row": [1, 1, 2, 3, 2, 4, 5, 6],
@@ -1733,19 +1734,39 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                          '0', '33', '15', '33', '0', '0', '33']  # 对应sheet中的列，设置为0则不设置副坐标轴
         else:
             tempindex = ['0'] * len(ringsindex)
-        if self.classicCheckBox.isChecked():
-            tempindex = ['4', '5', '0', '0',
-                         '15', '0', '0', '0',
-                         '0', '12', '0', '0', '0', '0']  # 对应sheet中的列，设置为0则不设置副坐标轴
-            charttitles[2] = '1050nm单环吸光度'
+
 
         infoindex = [False, False, False, False,
                      True, True, True, True,
                      False, True, False, True, False, False, True]
 
+        if self.classicCheckBox.isChecked():
+            charttitles = ['12环差分信号vs.室温', '23环差分信号vs.测头旁皮肤温度',
+                           '1050nm单环吸光度', '1219nm单环吸光度',
+                           '34环差分信号vs.加热功率', '45环差分信号vs.测头相对扶手高度(cm)',
+                           '1314nm单环吸光度', '1409nm单环吸光度',
+                           '1050nm差分吸光度', '1219nm差分吸光度vs.测头下实际温度',
+                           '1550nm单环吸光度', '1550nm差分吸光度', 'Diff1550-Diff1050', '1609nm单环吸光度']
+
+            ringsindex = ['Diff12', 'Diff23', '1050', '1219',
+                          'Diff34', 'Diff45', '1314', '1409',
+                          'Diff1050', 'Diff1219', '1550',
+                          'Diff1550', 'Diff1550-Diff1050', '1609']
+
+            tempindex = ['4', '5', '0', '0',
+                         '15', '33', '0', '0',
+                         '33', '12', '0', '0', '0', '0', '33'] if self.TempCheckBox.isChecked() else ['0'] * len(ringsindex)
+
+            self.duplicate_target = {"name": ['1050', '1219', '1550', 'Diff1050', 'Diff1219', 'Diff1550', 'Diff1550-Diff1050'],         # 1050, 1219, 1550, diff1050, diff1219, diff1550, diff1550-1050
+                                    "ignore_series": [[], [], [], [], [], [], []],
+                                    "delete_original": [False, False, False, False, False, True, False],
+                                    "row": [1, 1, 2, 3, 2, 4, 5],
+                                    }
+
         if self.OGTTCheckBox.isChecked():  # OGTT时的血糖值绘制准备
-            tempindex[8] = str(rng_lcol + 2)
-            charttitles[8] = charttitles[8] + ' vs.血糖值'
+            replace_index = ringsindex.index('Diff1550-Diff1050')
+            tempindex[replace_index] = str(rng_lcol + 2)
+            charttitles[replace_index] = charttitles[replace_index] + ' vs.血糖值'
 
         if self.tempCorrelationCheckBox.isChecked():
             replace_index = ringsindex.index('1609')
