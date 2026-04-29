@@ -46,7 +46,9 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
     """
 
     # ==================== 类配置变量 ====================
+    COR1050 = 1
     COR1219 = 3
+    COR1314 = 0
 
     # 图表绘制配置
     CHART_LEFT = 400        # 图表左距
@@ -1721,7 +1723,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                        '34环差分信号vs.加热功率', '45环差分信号vs.测头相对扶手高度(cm)',
                        '1314nm单环吸光度', '1409nm单环吸光度',
                        'Diff1550-Diff1050', '1050nm差分吸光度',
-                       '1550nm单环吸光度', '1550nm差分吸光度', '1219nm差分吸光度', '1609nm单环吸光度', 'Diff1550-1050-k×1219']
+                       '1550nm单环吸光度', '1550nm差分吸光度', '1219nm差分吸光度', '1609nm单环吸光度', 'Diff1550-k1×1050-k2×1219-k3×1314']
 
         ringsindex = ['Diff12', 'Diff23', '1050', '1219',
                       'Diff34', 'Diff45', '1314', '1409',
@@ -2247,11 +2249,11 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 # 在 Excel 中插入计算公式
                 for target, indice in zip(targets, indices):
                     base_addr = int(self.FindRowColRange(datasheet, 'Col', target, SRRange))
-                    addr1, addr2 = xw.utils.col_name(base_addr + waveIndex1), xw.utils.col_name(base_addr + waveIndex2)
+                    addr15, addr10 = xw.utils.col_name(base_addr + waveIndex1), xw.utils.col_name(base_addr + waveIndex2)
 
                     # 绝对引用公式
                     if len(each) == 17:
-                        formula = f"=${addr1}2-${addr2}2"
+                        formula = f"=${addr15}2-${addr10}2"
                     elif len(each) == 22:
                         """
                         设置温度校正后的波长差分公式，并将1050温度校正系数和使用的温度列写入文件中
@@ -2273,27 +2275,31 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                         sheet_target.range(temp_corr_addr + '4').value = 'TC1实际温度'
 
                         # 组合公式
-                        formula = f"=${addr1}2-${addr2}2+${temp_corr_addr}$2*({temp_addr}-{base_temp_addr})"
+                        formula = f"=${addr15}2-${addr10}2+${temp_corr_addr}$2*({temp_addr}-{base_temp_addr})"
                     elif len(each) == len('Diff1550-Diff1050-kDiff1219'):
                         """
                         设置接口矫正模型
-                        公式: $ Diff1550 - Diff1050 - k \cdot Diff1219$
+                        公式: $ Diff1550 - k_1 \cdot Diff1050 - k_2 \cdot Diff1219 - k_2 \cdot Diff1314$
                         """
                         waveIndex3 = 2
-                        addr3 = xw.utils.col_name(base_addr + waveIndex3)
-                        corr_addr = xw.utils.col_name(last_col + len(targets) + 2)
+                        addr12 = xw.utils.col_name(base_addr + waveIndex3)
+                        addr13 = xw.utils.col_name(base_addr + waveIndex3 + 1)
+                        corr_addr = xw.utils.col_name(last_col + len(targets) + 2 + targets.index(target))
                         sheet_target.range(xw.utils.col_name(last_col + 1) + '1').value = ' '
-                        sheet_target.range(corr_addr + '2').value = '矫正系数'
-                        sheet_target.range(corr_addr + '3').value = self.COR1219
+                        sheet_target.range(corr_addr + '1').value = '矫正系数'
+                        sheet_target.range(corr_addr + '2').value = target
+                        sheet_target.range(corr_addr + '3').value = self.COR1050
+                        sheet_target.range(corr_addr + '4').value = self.COR1219
+                        sheet_target.range(corr_addr + '5').value = self.COR1314
 
-                        formula = f"=${addr1}2-${addr2}2-${corr_addr}$3*${addr3}2"
+                        formula = f"=${addr15}2-${corr_addr}$3*${addr10}2-${corr_addr}$4*${addr12}2-${corr_addr}$5*${addr13}2"
 
                     # 填充整个列（从 2 到最后一行）
                     sheet_target.range(f"{indice}2:{indice}{datasheet.used_range.last_cell.row}").formula = formula
 
                     # 设置表头信息
                     sheet_target.range(f"{indice}1").value = None
-                    sheet_target.range(f"{indice}2").value = target + ' ' + wave1 + '-' + wave2
+                    sheet_target.range(f"{indice}2").value = target
 
                 PltRangeS += f", {indices[0]}1:{indices[-1]}{datasheet.used_range.last_cell.row}"
                 if not self.waveDiffCheckBox.isChecked():
