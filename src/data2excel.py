@@ -1749,20 +1749,20 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
         if self.classicCheckBox.isChecked():
             charttitles = ['12环差分信号vs.室温', '23环差分信号vs.测头旁皮肤温度',
-                           '1050nm单环吸光度', '1219nm单环吸光度',
+                           '1050nm单环吸光度', '1314nm单环吸光度',
                            '34环差分信号vs.加热功率', '45环差分信号vs.测头相对扶手高度(cm)',
-                           '1314nm单环吸光度', '1409nm单环吸光度',
+                           '1219nm单环吸光度', '1409nm单环吸光度',
                            '1050nm差分吸光度', '1219nm差分吸光度vs.测头下实际温度',
                            '1550nm单环吸光度', '1550nm差分吸光度', 'Diff1550-Diff1050', '1609nm单环吸光度']
 
-            ringsindex = ['Diff12', 'Diff23', '1050', '1219',
-                          'Diff34', 'Diff45', '1314', '1409',
+            ringsindex = ['Diff12', 'Diff23', '1050', '1314',
+                          'Diff34', 'Diff45', '1219', '1409',
                           'Diff1050', 'Diff1219', '1550',
                           'Diff1550', 'Diff1550-Diff1050', '1609']
 
             tempindex = ['4', '5', '0', '0',
                          '15', '33', '0', '0',
-                         '33', '12', '0', '0', '0', '0', '33'] if self.TempCheckBox.isChecked() else ['0'] * len(ringsindex)
+                         '33', '12', '0', '0', '0', '0', '0'] if self.TempCheckBox.isChecked() else ['0'] * len(ringsindex)
 
             self.duplicate_target = {"name": ['1050', '1219', '1550', 'Diff1050', 'Diff1219', 'Diff1550', 'Diff1550-Diff1050'],         # 1050, 1219, 1550, diff1050, diff1219, diff1550, diff1550-1050
                                     "ignore_series": [[], [], [], [], [], [], []],
