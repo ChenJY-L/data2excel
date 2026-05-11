@@ -201,7 +201,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             basefilename = ''
         else:
             basefilename = filenamesnew[len(filenamesnew) - 1]
-        return os.path.join(path, basefilename)
+        return os.path.join(path, basefilename) if basefilename != '' else None
 
     def CheckSheet(self, workbook, sheetname):
         """
@@ -510,14 +510,19 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             self.GuiRefresh(self.Status, 'Loading Temperature Data')
             temppath = os.path.split(Chpath)[0]
             tempfilekwords = '温度' if C else 'Temperature'
-            wbt = self.xwapp.books.open(self.FilePath(temppath, tempfilekwords))
-            tempsheet = wbt.sheets[0]
-            Tempvalue = tempsheet.range(tempsheet.used_range).value
-            Temptitle = Tempvalue[0][:]
-            Tempvalue = Tempvalue[1:][:]
-            Temptitle = np.asarray(Temptitle)
-            Tempvalue = np.asarray(Tempvalue)
-            wbt.close()
+            temp_file = self.FilePath(temppath, tempfilekwords)
+            if temp_file is None:
+                # temp数据不存在
+                self.TempCheckBox.setChecked(False)
+            else:
+                wbt = self.xwapp.books.open(temp_file)
+                tempsheet = wbt.sheets[0]
+                Tempvalue = tempsheet.range(tempsheet.used_range).value
+                Temptitle = Tempvalue[0][:]
+                Tempvalue = Tempvalue[1:][:]
+                Temptitle = np.asarray(Temptitle)
+                Tempvalue = np.asarray(Tempvalue)
+                wbt.close()
 
         return Tempvalue, Temptitle
 
