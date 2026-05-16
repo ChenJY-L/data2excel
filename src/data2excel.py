@@ -33,6 +33,13 @@ from PySide6.QtGui import QIcon
 import gui as QTUI  # GUI界面模块
 import ico01
 import ctypes
+from chart_config import (
+    build_chart_plan,
+    get_annotation_bounds,
+    get_bounds,
+    load_chart_config,
+    resolve_secondary_axis_value,
+)
 
 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("myappid")
 
@@ -81,17 +88,6 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
     ERROR_THRESH = 5e-6
 
     TempCorr1050 = 0.0005   # 1050差分温度矫正系数
-    """
-    用于设置复制放大的chart的id和需要忽略的chart
-    """
-    duplicate_target = {
-        "index": [2, 3, 10, 9, 12, 11, 8, 14],         # 1050, 1219, 1550, diff1050, diff1219, diff1550, diff1550-1050
-        "name": ['1050', '1219', '1550', 'Diff1050', 'Diff1219', 'Diff1550', 'Diff1550-Diff1050', 'Diff1550-Diff1050-kDiff1219'],
-        "ignore_series": [[], [], [], [], [], [], [], []],
-        "delete_original": [False, False, False, False, True, True, False, True],
-        "row": [1, 1, 2, 3, 2, 4, 5, 6],
-    }
-
     # 绘图后追加目标系列（默认关闭）
     # target_id 支持示例: Diff12 / Ring3 / 3环 / Ch3 / 3
     CHART_TARGET_OVERLAY = {
@@ -124,7 +120,6 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         self.waveDiffCheckBox.setChecked(True)
         self.expInfoCheckBox.setChecked(True)
         self.tempCorrelationCheckBox.setChecked(True)
-        self.duplicateCheckBox.setChecked(True)
         self.classicCheckBox.setChecked(False)
         self.autoSetBaseCheckBox.setChecked(True)
 
@@ -1665,37 +1660,6 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         r2 = 1
         return slope, r2
 
-    def create_refresh_button(self, wb, sheetnames, expInfo):
-        """
-        添加刷新按键
-        默认添加到固定位置，调用固定的vba
-
-        Args:
-            wb: Excel工作簿对象
-            sheetnames: 工作表名称列表
-        """
-        if expInfo is None:
-            return
-
-        self.GuiRefresh(self.Status, "Adding refresh button... ")
-
-        button_text = '刷新标注框'
-        macro_name = "Updater.xlam!ChartAnnotationUpdater.RefreshAllChartAnnotations"  # 绑定的宏（如需模块前缀，加上 ModuleName.）
-
-        # 按钮位置与大小（像素）
-        left, top, width, height = self.CHART_LEFT + self.CHART_WIDTH*4, self.CHART_TOP, 160, 100
-        ws = wb.sheets[sheetnames[4]]
-
-        # 添加一个“表单控件按钮”
-        btn = ws.api.Buttons().Add(left, top, width, height)
-        btn.Characters.Text = button_text
-        btn.OnAction = macro_name
-
-        btn.ShapeRange.Fill.ForeColor.RGB = xw.utils.rgb_to_int(self.TITLE_BOX_COLOR)
-        btn.Characters.Font.Name = "Times New Roman"
-        btn.Characters.Font.Size = self.MAIN_TITLE_FONT_SIZE
-        btn.Characters.Font.Bold = 1
-
     def create_charts(self, wb, sheetnames, timearr, wave, Ch, wn, rng_lcol, expInfo, Chpath, C):
         """
         创建图表
@@ -1722,68 +1686,19 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         # 重置图表列表
         self.charts = []
 
-        # 图表配置信息
-        charttitles = ['12环差分信号vs.室温', '23环差分信号vs.测头旁皮肤温度',
-                       '1050nm单环吸光度vs.测头下实际温度', '1219nm单环吸光度',
-                       '34环差分信号vs.加热功率', '45环差分信号vs.测头相对扶手高度(cm)',
-                       '1314nm单环吸光度', '1409nm单环吸光度',
-                       'Diff1550-Diff1050', '1050nm差分吸光度',
-                       '1550nm单环吸光度', '1550nm差分吸光度', '1219nm差分吸光度', '1609nm单环吸光度', 'Diff1550-k1×1050-k2×1219-k3×1314']
-
-        ringsindex = ['Diff12', 'Diff23', '1050', '1219',
-                      'Diff34', 'Diff45', '1314', '1409',
-                      'Diff1550-Diff1050', 'Diff1050', '1550',
-                      'Diff1550', 'Diff1219', '1609', 'Diff1550-Diff1050-kDiff1219']
-
-        if self.TempCheckBox.isChecked():
-            tempindex = ['4', '5', '12', '0',
-                         '15', '33', '0', '0',
-                         '0', '33', '15', '33', '0', '0', '33']  # 对应sheet中的列，设置为0则不设置副坐标轴
-        else:
-            tempindex = ['0'] * len(ringsindex)
-
-
-        infoindex = [False, False, False, False,
-                     True, True, True, True,
-                     False, True, False, True, False, False, True]
-
-        if self.classicCheckBox.isChecked():
-            charttitles = ['12环差分信号vs.室温', '23环差分信号vs.测头旁皮肤温度',
-                           '1050nm单环吸光度', '1314nm单环吸光度',
-                           '34环差分信号vs.加热功率', '45环差分信号vs.测头相对扶手高度(cm)',
-                           '1219nm单环吸光度', '1409nm单环吸光度',
-                           '1050nm差分吸光度', '1219nm差分吸光度vs.测头下实际温度',
-                           '1550nm单环吸光度', '1550nm差分吸光度', 'Diff1550-Diff1050', '1609nm单环吸光度']
-
-            ringsindex = ['Diff12', 'Diff23', '1050', '1314',
-                          'Diff34', 'Diff45', '1219', '1409',
-                          'Diff1050', 'Diff1219', '1550',
-                          'Diff1550', 'Diff1550-Diff1050', '1609']
-
-            tempindex = ['4', '5', '0', '0',
-                         '15', '33', '0', '0',
-                         '33', '12', '0', '0', '0', '0', '0'] if self.TempCheckBox.isChecked() else ['0'] * len(ringsindex)
-
-            self.duplicate_target = {"name": ['1050', '1219', '1550', 'Diff1050', 'Diff1219', 'Diff1550', 'Diff1550-Diff1050'],         # 1050, 1219, 1550, diff1050, diff1219, diff1550, diff1550-1050
-                                    "ignore_series": [[], [], [], [], [], [], []],
-                                    "delete_original": [False, False, False, False, False, True, False],
-                                    "row": [1, 1, 2, 3, 2, 4, 5],
-                                    }
-
-        if self.OGTTCheckBox.isChecked():  # OGTT时的血糖值绘制准备
-            replace_index = ringsindex.index('Diff1550-Diff1050')
-            tempindex[replace_index] = str(rng_lcol + 2)
-            charttitles[replace_index] = charttitles[replace_index] + ' vs.血糖值'
-
-        if self.tempCorrelationCheckBox.isChecked():
-            replace_index = ringsindex.index('1609')
-            charttitles[replace_index] = '温度校正后的波长差分'
-            ringsindex[replace_index] = 'Diff1550-Diff1050-temp'
-            tempindex[replace_index] = '0'
-
-            charttitles.append('1609nm单环吸光度')
-            ringsindex.append('1609')
-            tempindex.append('0')
+        chart_config = load_chart_config()
+        chart_plan = build_chart_plan(
+            chart_config,
+            classic=self.classicCheckBox.isChecked(),
+            temp_enabled=self.TempCheckBox.isChecked(),
+            ogtt=self.OGTTCheckBox.isChecked(),
+            temp_correlation=self.tempCorrelationCheckBox.isChecked(),
+            rng_lcol=rng_lcol,
+        )
+        charttitles = [chart["title"] for chart in chart_plan]
+        ringsindex = [chart["source"] for chart in chart_plan]
+        tempindex = [chart["temp"] for chart in chart_plan]
+        infoindex = [chart["info"] for chart in chart_plan]
 
         pltN = len(charttitles)
         SRRange = 'A1:ZZ2'
@@ -1802,7 +1717,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         # 创建图表的详细实现
         self._create_individual_charts(wb, sheetnames, charttitles, ringsindex, tempindex, infoindex,
                                        wave, Ch, wn, timearr, expInfo, Chpath, C, rng_lcol, pltN, SRRange,
-                                       diffSheet, sglSheet, tempSheet)
+                                       diffSheet, sglSheet, tempSheet, chart_plan, chart_config)
 
     def write_segment_points_sheet(self, wb, segment_points, C):
         """
@@ -1923,6 +1838,17 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 sheet.api.Move(Before=wb.sheets[1].api)
             else:
                 sheet.api.Move(After=wb.sheets[target_pos - 1].api)
+
+    def _get_sheet_headers(self, sheet):
+        try:
+            last_col = sheet.used_range.last_cell.column
+            values = sheet.range((1, 1), (1, last_col)).value
+        except Exception:
+            return []
+
+        if values is None:
+            return []
+        return values if isinstance(values, list) else [values]
 
     def promote_autobase_absorbance_sheets(self, wb, sheetnames, C):
         """
@@ -2163,7 +2089,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
     def _create_individual_charts(self, wb, sheetnames, charttitles, ringsindex, tempindex, infoindex,
                                   wave, Ch, wn, timearr, expInfo, Chpath, C, rng_lcol, pltN, SRRange,
-                                  diffSheet, sglSheet, tempSheet):
+                                  diffSheet, sglSheet, tempSheet, chart_plan, chart_config):
         """
         创建具体的图表实现
 
@@ -2185,7 +2111,11 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             pltN: 图表数量
             SRRange: 搜索范围
             diffSheet, sglSheet, tempSheet: 各工作表对象
+            chart_plan: 已解析的图表配置列表
+            chart_config: 原始图表JSON配置
         """
+        temp_headers = self._get_sheet_headers(tempSheet)
+
         for p, each in enumerate(ringsindex):
             if each == '0':
                 self.charts.append(None)
@@ -2197,7 +2127,21 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             # 副座标轴Series个数
             secondary_axis_series_count = 0
 
-            if len(each) == 6 and '-' not in each:  # 差分数据，如'Diff12'
+            ring_source_match = re.fullmatch(r"^Ring-?(\d+)$", str(each), re.IGNORECASE)
+
+            if ring_source_match:  # 单个环的全部波长数据，如'Ring-3'
+                ring_num = int(ring_source_match.group(1))
+                if ring_num < 1 or ring_num > Ch:
+                    self.charts.append(None)
+                    continue
+                datasheet = sglSheet
+                start_col = 4 + 7 * (ring_num - 1)
+                end_col = start_col + wn - 1
+                addrstr = xw.utils.col_name(start_col) + ':' + xw.utils.col_name(end_col)
+                PltRangeS = PltRangeS + ', ' + addrstr
+                ytitle = 'ΔA'
+
+            elif len(each) == 6 and '-' not in each:  # 差分数据，如'Diff12'
                 datasheet = diffSheet
                 addr = self.FindRowColRange(datasheet, 'Col', each, SRRange)
                 addrstr = xw.utils.col_name(int(addr) + 1) + ':' + xw.utils.col_name(int(addr) + wn)
@@ -2322,20 +2266,28 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             pltrange = datasheet.range(PltRangeS)
 
             # 设置副坐标轴数据范围
+            secondary_axis_cfg = chart_plan[p].get("secondary_axis")
+            secondary_axis_value = tempindex[p]
+            if isinstance(secondary_axis_cfg, dict):
+                secondary_axis_value = resolve_secondary_axis_value(
+                    secondary_axis_cfg,
+                    temp_headers,
+                    rng_lcol,
+                )
             secrange = None
             try:
-                temp_col = int(tempindex[p])
+                temp_col = int(secondary_axis_value)
             except TypeError:
                 # 设置副坐标轴为光谱数据
                 temp_col = -1
                 secaddrstr = None
-                if 'Diff' in tempindex[p][0]:
+                if 'Diff' in secondary_axis_value[0]:
                     datasheet = diffSheet
                 else:
                     datasheet = sglSheet
 
                 addr_list = []
-                for wave_target in tempindex[p]:
+                for wave_target in secondary_axis_value:
                     # 差分数据
                     wave_index = wave.index(wave_target[-4:]) + 1
                     addr = self.FindRowColRange(datasheet, 'Col', wave_target[:6], SRRange)
@@ -2351,7 +2303,15 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 secrange = datasheet.range(secaddrstr)
 
             if temp_col > 0:
-                if temp_col > rng_lcol:  # 血糖数据
+                is_glucose_axis = (
+                    isinstance(secondary_axis_cfg, dict)
+                    and secondary_axis_cfg.get("source") == "glucose"
+                ) or (
+                    isinstance(secondary_axis_cfg, dict)
+                    and secondary_axis_cfg.get("_legacy_temp")
+                    and temp_col > rng_lcol
+                )
+                if is_glucose_axis:  # 血糖数据
                     secaddr = xw.utils.col_name(temp_col)
                     secaddrstr = secaddr + ':' + secaddr
                     SecRangeS = secaddrstr
@@ -2364,24 +2324,14 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
 
             self.GuiRefresh(self.Status, 'Plotting ' + str(p + 1) + '/' + str(pltN))
 
-            figure_lft = (self.CHART_LEFT + self.CHART_WIDTH * int(p % 4))
-            figure_top = (self.CHART_TOP + self.CHART_HEIGHT * int(p / 4))
-
-            if self.waveDiffCheckBox.isChecked() and len(each) == 17:
-                # 特殊处理Diff1550-Diff1050的位置
-                figure_lft = self.CHART_LEFT
-                figure_top = self.CHART_TOP + self.CHART_HEIGHT * 2
-
-            if p > 11:
-                figure_lft = self.CHART_LEFT + self.CHART_WIDTH * 3
-                figure_top = self.CHART_TOP + self.CHART_HEIGHT * 2
+            figure_lft, figure_top, figure_width, figure_height = get_bounds(chart_plan[p])
 
             # 创建图表
             chart = wb.sheets[sheetnames[4]].charts.add(
                 left=figure_lft,
                 top=figure_top,
-                width=self.CHART_WIDTH,
-                height=self.CHART_HEIGHT,
+                width=figure_width,
+                height=figure_height,
             )
             self.charts.append(chart)
 
@@ -2414,11 +2364,11 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                     chartApi.SeriesCollection(series_count).Format.Line.Weight = self.LINE_WEIGHT
                     secondary_axis_series_count += 1
                 else:  # 普通温度数据
-                    if isinstance(tempindex[p], list):
+                    if isinstance(secondary_axis_value, list):
                         last_row = datasheet.used_range.last_cell.row
                         x_range = datasheet.range(f'A3:A{last_row}')
 
-                        for addr, wave_target in zip(addr_list, tempindex[p]):
+                        for addr, wave_target in zip(addr_list, secondary_axis_value):
                             new_series = chartApi.SeriesCollection().NewSeries()
                             new_series.Name = wave_target
                             column_letter = addr.split(':')[0]
@@ -2470,58 +2420,31 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             # 添加实验信息标注
             if expInfo and (self.expInfoCheckBox.isChecked() or infoindex[p]):
                 # with_subaxis = False if temp_col <= 0 else True
-                self._add_experiment_annotations(chartApi, expInfo, timearr, p, secondary_axis_series_count)
+                self._add_experiment_annotations(chartApi, expInfo, timearr, ringsindex[p], secondary_axis_series_count)
 
-            # 图表复制并放大
-            if self.duplicateCheckBox.isChecked() and ringsindex[p] in self.duplicate_target["name"]:
-                duplicate_index = self.duplicate_target["name"].index(ringsindex[p])
-                dup_row = self.duplicate_target["row"][duplicate_index] - 1
-                duplicated_chart = chartApi.Parent.Duplicate()
-                duplicated_chart.Top = 200 + self.CHART_TOP + self.CHART_HEIGHT*3 + dup_row*0.85*self.CHART_HEIGHT
-                duplicated_chart.Left = self.CHART_LEFT + self.CHART_WIDTH
-                duplicated_chart.Width = 2.5 * self.CHART_WIDTH
-                duplicated_chart.Height = 0.85 * self.CHART_HEIGHT
+            for ignore_index in chart_plan[p].get("ignore_series", []):
+                chartApi.FullSeriesCollection(ignore_index).IsFiltered = True
 
-                if each == '1219' or each == 'Diff1219':
-                    duplicated_chart.Width = self.CHART_WIDTH
-                    duplicated_chart.Left = duplicated_chart.Left + 2.5 * self.CHART_WIDTH
-
-                for ignore_index in self.duplicate_target["ignore_series"][duplicate_index]:
-                    duplicated_chart.Chart.FullSeriesCollection(ignore_index).IsFiltered = True
-
-                self.AXIS_FONT_SIZE += 6
-                self.AXIS_TITLE_FONT_SIZE += 6
-                self._configure_chart_appearance(duplicated_chart.Chart, charttitles[p], ytitle, temp_col, wb, sheetnames, rng_lcol)
-                self.AXIS_FONT_SIZE -= 6
-                self.AXIS_TITLE_FONT_SIZE -= 6
-
-                # 删除原始图（可选）
-                if self.duplicate_target["delete_original"][duplicate_index]:
-                    chartApi.Parent.Delete()
-
-                # 在复制图完成后，再按配置追加主坐标轴目标系列
-                overlay_cfg = self.CHART_TARGET_OVERLAY
-                if overlay_cfg.get("enabled"):
-                    chart_key = str(overlay_cfg.get("chart_key", "")).strip()
-                    if chart_key == "" or chart_key == each:
-                        self._add_target_series_to_main_axis(
-                            wavelength=overlay_cfg.get("wavelength"),
-                            target_id=overlay_cfg.get("target_id"),
-                            color=overlay_cfg.get("color"),
-                            chartApi=duplicated_chart.Chart,
-                            wave=wave,
-                            Ch=Ch,
-                            SRRange=SRRange,
-                            diffSheet=diffSheet,
-                            sglSheet=sglSheet
-                        )
+            for overlay_cfg in chart_plan[p].get("extra_series", []):
+                if overlay_cfg.get("enabled", True):
+                    self._add_target_series_to_main_axis(
+                        wavelength=overlay_cfg.get("wavelength"),
+                        target_id=overlay_cfg.get("target_id"),
+                        color=overlay_cfg.get("color"),
+                        chartApi=chartApi,
+                        wave=wave,
+                        Ch=Ch,
+                        SRRange=SRRange,
+                        diffSheet=diffSheet,
+                        sglSheet=sglSheet
+                    )
 
             # 更新UI
             self.currenttime = datetime.datetime.now()
             self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
 
         # 添加备注和标题
-        self._add_chart_annotations(wb, sheetnames, expInfo, Chpath)
+        self._add_chart_annotations(wb, sheetnames, expInfo, Chpath, chart_config)
 
         # 添加刷新按键函数
         # self.create_refresh_button(wb, sheetnames, expInfo)
@@ -2740,7 +2663,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         for count in range(1, series_count):
             chartApi.FullSeriesCollection(count).Format.Line.Weight = self.LINE_WEIGHT
 
-    def _add_experiment_annotations(self, chartApi, expInfo, timearr, chart_index, secondary_axis_series_count):
+    def _add_experiment_annotations(self, chartApi, expInfo, timearr, chart_source, secondary_axis_series_count):
         """
         添加实验信息标注到图表
 
@@ -2748,7 +2671,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             chartApi: 图表API对象
             expInfo: 实验信息字典
             timearr: 时间数组
-            chart_index: 图表索引
+            chart_source: 图表来源标识
         """
         # 获取当前系列数量，用于后续图例删除
         initial_series_count = chartApi.SeriesCollection().Count + 1
@@ -2823,7 +2746,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             series.Name = f"_ANNOTATION_BOX_{nitem}"
 
             # 在特定图表上添加标签
-            if chart_index in (5, 9, 11):  # Diff45, Diff1050, Diff1550
+            if chart_source in ("Diff45", "Diff1050", "Diff1550"):
                 series.Points(pointIdx).ApplyDataLabels()
                 series.Points(pointIdx).DataLabel.Text = item["activity"]
                 series.Points(pointIdx).DataLabel.Font.Size = self.LABEL_FONT_SIZE
@@ -2837,7 +2760,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             leg.Delete()
 
 
-    def _add_chart_annotations(self, wb, sheetnames, expInfo, Chpath):
+    def _add_chart_annotations(self, wb, sheetnames, expInfo, Chpath, chart_config=None):
         """
         添加图表标注和备注
 
@@ -2846,16 +2769,26 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             sheetnames: 工作表名称列表
             expInfo: 实验信息
             Chpath: 数据文件路径
+            chart_config: 图表JSON配置
         """
         # 添加备注文本框
         if expInfo:
             self.GuiRefresh(self.Status, 'Adding remarks')
+            remark_key = "classic_remark_box" if self.classicCheckBox.isChecked() else "remark_box"
+            remark_bounds = get_annotation_bounds(chart_config or {}, remark_key)
+            if remark_bounds is None:
+                remark_bounds = (
+                    self.CHART_LEFT + self.CHART_WIDTH * 2,
+                    self.CHART_TOP + self.CHART_HEIGHT * 1,
+                    self.CHART_WIDTH / 2,
+                    self.CHART_HEIGHT,
+                )
             textbox = wb.sheets[sheetnames[4]].shapes.api.AddTextbox(
                 Orientation=1,  # 水平方向
-                Left=self.CHART_LEFT + self.CHART_WIDTH * 2,
-                Top=self.CHART_TOP + self.CHART_HEIGHT * 1,
-                Width=self.CHART_WIDTH / 2,
-                Height=self.CHART_HEIGHT,
+                Left=remark_bounds[0],
+                Top=remark_bounds[1],
+                Width=remark_bounds[2],
+                Height=remark_bounds[3],
             )
             # 显示备注内容，如果没有备注则显示默认文本
             remark_text = "备注:\n" + (expInfo.get('remark', '') if expInfo.get('remark') else "")
@@ -2866,17 +2799,21 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             textbox.TextFrame2.TextRange.Characters.Font.Bold = 1
             textbox.Placement = xw.constants.Placement.xlFreeFloating
 
-            if self.classicCheckBox.isChecked():
-                textbox.Top = 200 + self.CHART_TOP + self.CHART_HEIGHT * 3
-                textbox.Left = self.CHART_LEFT + 3.5 * self.CHART_WIDTH
-
         # 添加标题文本框
+        title_bounds = get_annotation_bounds(chart_config or {}, "title_box")
+        if title_bounds is None:
+            title_bounds = (
+                self.CHART_LEFT,
+                self.CHART_TOP - 100,
+                self.CHART_WIDTH * 3,
+                100,
+            )
         titlebox = wb.sheets[sheetnames[4]].shapes.api.AddTextbox(
             Orientation=1,
-            Left=self.CHART_LEFT,
-            Top=self.CHART_TOP - 100,
-            Width=self.CHART_WIDTH * 3,
-            Height=100,
+            Left=title_bounds[0],
+            Top=title_bounds[1],
+            Width=title_bounds[2],
+            Height=title_bounds[3],
         )
         titlebox.Fill.ForeColor.RGB = xw.utils.rgb_to_int(self.TITLE_BOX_COLOR)
         titlebox.TextFrame2.TextRange.Characters.Text = Chpath.split('\\')[-2]
@@ -2886,11 +2823,22 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         titlebox.TextFrame2.TextRange.Characters.Font.Bold = 1
         titlebox.Placement = xw.constants.Placement.xlFreeFloating
 
-        if self.duplicateCheckBox.isChecked():
-            duplicated_titlebox = titlebox.Duplicate()
-            duplicated_titlebox.Top = 200 + self.CHART_TOP + self.CHART_HEIGHT * 3 - 100
-            duplicated_titlebox.Left = self.CHART_LEFT + self.CHART_WIDTH
-            duplicated_titlebox.Width = 2.5 * self.CHART_WIDTH
+        duplicate_title_bounds = get_annotation_bounds(chart_config or {}, "duplicate_title_box")
+        if duplicate_title_bounds is not None:
+            duplicate_titlebox = wb.sheets[sheetnames[4]].shapes.api.AddTextbox(
+                Orientation=1,
+                Left=duplicate_title_bounds[0],
+                Top=duplicate_title_bounds[1],
+                Width=duplicate_title_bounds[2],
+                Height=duplicate_title_bounds[3],
+            )
+            duplicate_titlebox.Fill.ForeColor.RGB = xw.utils.rgb_to_int(self.TITLE_BOX_COLOR)
+            duplicate_titlebox.TextFrame2.TextRange.Characters.Text = Chpath.split('\\')[-2]
+            duplicate_titlebox.TextFrame2.VerticalAnchor = 3
+            duplicate_titlebox.TextFrame2.TextRange.Characters.Font.Name = "Times New Roman"
+            duplicate_titlebox.TextFrame2.TextRange.Characters.Font.Size = self.MAIN_TITLE_FONT_SIZE
+            duplicate_titlebox.TextFrame2.TextRange.Characters.Font.Bold = 1
+            duplicate_titlebox.Placement = xw.constants.Placement.xlFreeFloating
 
     # ==================== 窗口事件处理 ====================
 

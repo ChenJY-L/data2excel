@@ -1,0 +1,668 @@
+{
+  "version": 1,
+  "annotations": {
+    "title_box": {
+      "left": 400,
+      "top": 300,
+      "width": 2100,
+      "height": 100
+    },
+    "duplicate_title_box": {
+      "left": 400,
+      "top": 2090,
+      "width": 1750,
+      "height": 100
+    },
+    "remark_box": {
+      "left": 2150,
+      "top": 3550,
+      "width": 590,
+      "height": 330
+    }
+  },
+  "charts": [
+    {
+      "source": "Diff12",
+      "title": "12环差分信号vs.室温",
+      "temp": 4,
+      "info": false,
+      "bounds": {
+        "left": 400,
+        "top": 400,
+        "width": 700,
+        "height": 400
+      }
+    },
+    {
+      "source": "Diff45",
+      "title": "45环差分信号vs.测头相对扶手高度(cm)",
+      "temp": 33,
+      "info": false,
+      "bounds": {
+        "left": 1100,
+        "top": 400,
+        "width": 700,
+        "height": 400
+      }
+    },
+    {
+      "source": "1050",
+      "title": "1050nm单环吸光度vs.测头下实际温度",
+      "temp": 0,
+      "info": false,
+      "bounds": {
+        "left": 1800,
+        "top": 400,
+        "width": 700,
+        "height": 400
+      }
+    },
+    {
+      "source": "1050",
+      "title": "1050nm单环吸光度vs.测头下实际温度",
+      "temp": 0,
+      "info": false,
+      "bounds": {
+        "left": 400,
+        "top": 2190,
+        "width": 1750,
+        "height": 340
+      },
+      "key": "1050_copy",
+      "ignore_series": [],
+      "secondary_axis": {
+        "enabled": true,
+        "source": "temperature",
+        "match": {
+          "type": "column",
+          "value": 12
+        }
+      }
+    },
+    {
+      "source": "1314",
+      "title": "1314nm单环吸光度",
+      "temp": 0,
+      "info": false,
+      "bounds": {
+        "left": 2500,
+        "top": 400,
+        "width": 700,
+        "height": 400
+      }
+    },
+    {
+      "source": "Diff23",
+      "title": "23环差分信号vs.测头旁皮肤温度",
+      "temp": 5,
+      "info": true,
+      "bounds": {
+        "left": 400,
+        "top": 800,
+        "width": 700,
+        "height": 400
+      }
+    },
+    {
+      "source": "Diff1050",
+      "title": "1050nm差分吸光度vs.侧头下实际温度",
+      "temp": 12,
+      "info": true,
+      "bounds": {
+        "left": 1100,
+        "top": 800,
+        "width": 700,
+        "height": 400
+      }
+    },
+    {
+      "source": "Diff1050",
+      "title": "1050nm差分吸光度",
+      "temp": 12,
+      "info": true,
+      "bounds": {
+        "left": 400,
+        "top": 2870,
+        "width": 1750,
+        "height": 340
+      },
+      "key": "Diff1050_copy",
+      "ignore_series": [],
+      "secondary_axis": {
+        "enabled": true,
+        "source": "temperature",
+        "match": {
+          "type": "column",
+          "value": 23
+        }
+      }
+    },
+    {
+      "source": "1219",
+      "title": "1219nm单环吸光度",
+      "temp": 0,
+      "info": true,
+      "bounds": {
+        "left": 1800,
+        "top": 800,
+        "width": 700,
+        "height": 400
+      }
+    },
+    {
+      "source": "1219",
+      "title": "1219nm单环吸光度",
+      "temp": 0,
+      "info": true,
+      "bounds": {
+        "left": 2150,
+        "top": 2190,
+        "width": 1750,
+        "height": 340
+      },
+      "key": "1219_copy",
+      "ignore_series": []
+    },
+    {
+      "source": "1409",
+      "title": "1409nm单环吸光度",
+      "temp": 0,
+      "info": true,
+      "bounds": {
+        "left": 2500,
+        "top": 800,
+        "width": 700,
+        "height": 400
+      }
+    },
+    {
+      "source": "Diff34",
+      "title": "34环差分信号vs.加热功率",
+      "temp": 15,
+      "info": false,
+      "bounds": {
+        "left": 400,
+        "top": 1200,
+        "width": 700,
+        "height": 400
+      }
+    },
+    {
+      "source": "Diff1219",
+      "title": "1219nm差分吸光度",
+      "temp": 12,
+      "info": true,
+      "bounds": {
+        "left": 2150,
+        "top": 2530,
+        "width": 1750,
+        "height": 340
+      },
+      "key": "Diff1219_copy",
+      "ignore_series": [],
+      "secondary_axis": {
+        "enabled": false,
+        "source": "none"
+      }
+    },
+    {
+      "source": "1550",
+      "title": "1550nm单环吸光度",
+      "temp": 15,
+      "info": false,
+      "bounds": {
+        "left": 1800,
+        "top": 1200,
+        "width": 700,
+        "height": 400
+      },
+      "secondary_axis": {
+        "enabled": false,
+        "source": "none"
+      }
+    },
+    {
+      "source": "1550",
+      "title": "1550nm单环吸光度vs,加热功率",
+      "temp": 15,
+      "info": false,
+      "bounds": {
+        "left": 400,
+        "top": 2530,
+        "width": 1750,
+        "height": 340
+      },
+      "key": "1550_copy",
+      "ignore_series": []
+    },
+    {
+      "source": "Diff1550",
+      "title": "1550nm差分吸光度",
+      "temp": 33,
+      "info": true,
+      "bounds": {
+        "left": 400,
+        "top": 3210,
+        "width": 1750,
+        "height": 340
+      },
+      "key": "Diff1550_copy",
+      "ignore_series": []
+    },
+    {
+      "source": "1609",
+      "title": "1609nm单环吸光度",
+      "temp": 0,
+      "info": false,
+      "bounds": {
+        "left": 2500,
+        "top": 1200,
+        "width": 700,
+        "height": 400
+      },
+      "temp_correlation": {
+        "corrected": {
+          "source": "Diff1550-Diff1050-temp",
+          "title": "温度校正后的波长差分",
+          "temp": 0,
+          "bounds": {
+            "left": 2500,
+            "top": 1200,
+            "width": 700,
+            "height": 400
+          }
+        },
+        "original": {
+          "bounds": {
+            "left": 2500,
+            "top": 1200,
+            "width": 700,
+            "height": 400
+          }
+        }
+      }
+    },
+    {
+      "source": "Diff1219",
+      "title": "1219nm差分吸光度",
+      "temp": 0,
+      "info": false,
+      "bounds": {
+        "left": 1100,
+        "top": 1200,
+        "width": 700,
+        "height": 400
+      },
+      "secondary_axis": {
+        "enabled": true,
+        "source": "temperature",
+        "match": {
+          "type": "column",
+          "value": 23
+        }
+      },
+      "key": "Diff1219"
+    },
+    {
+      "source": "Diff1550-Diff1050",
+      "title": "Diff1550-Diff1050",
+      "temp": 0,
+      "info": false,
+      "bounds": {
+        "left": 400,
+        "top": 3550,
+        "width": 1750,
+        "height": 340
+      },
+      "key": "Diff1550-Diff1050_copy",
+      "ignore_series": [],
+      "secondary_axis": {
+        "enabled": true,
+        "source": "glucose"
+      }
+    },
+    {
+      "source": "Diff1550-Diff1050-kDiff1219",
+      "title": "Diff1550-k1×1050-k2×1219-k3×1314",
+      "temp": 33,
+      "info": true,
+      "bounds": {
+        "left": 400,
+        "top": 3890,
+        "width": 1750,
+        "height": 340
+      },
+      "key": "Diff1550-Diff1050-kDiff1219_copy",
+      "ignore_series": []
+    },
+    {
+      "source": "Diff1550-Diff1050",
+      "title": "Diff1550-Diff1050",
+      "temp": 0,
+      "info": false,
+      "bounds": {
+        "left": 400,
+        "top": 1600,
+        "width": 2800,
+        "height": 270
+      },
+      "key": "Diff1550-Diff1050_copy_copy",
+      "ignore_series": [],
+      "secondary_axis": {
+        "enabled": true,
+        "source": "glucose"
+      }
+    },
+    {
+      "source": "Diff45",
+      "title": "45环差分信号vs.测头相对扶手高度(cm)",
+      "temp": 33,
+      "info": false,
+      "bounds": {
+        "left": 2150,
+        "top": 2870,
+        "width": 1750,
+        "height": 340
+      },
+      "key": "Diff45_copy",
+      "secondary_axis": {
+        "enabled": false,
+        "source": "none"
+      }
+    },
+    {
+      "source": "Ring-5",
+      "title": "5环单环信号",
+      "temp": 33,
+      "info": false,
+      "bounds": {
+        "left": 2150,
+        "top": 3210,
+        "width": 1750,
+        "height": 340
+      },
+      "key": "Diff45_copy_copy",
+      "secondary_axis": {
+        "enabled": false,
+        "source": "none"
+      }
+    }
+  ],
+  "classic_charts": [
+    {
+      "source": "Diff12",
+      "title": "12环差分信号vs.室温",
+      "temp": 4,
+      "info": false,
+      "bounds": {
+        "left": 400,
+        "top": 400,
+        "width": 700,
+        "height": 400
+      }
+    },
+    {
+      "source": "Diff23",
+      "title": "23环差分信号vs.测头旁皮肤温度",
+      "temp": 5,
+      "info": false,
+      "bounds": {
+        "left": 1100,
+        "top": 400,
+        "width": 700,
+        "height": 400
+      }
+    },
+    {
+      "source": "1050",
+      "title": "1050nm单环吸光度",
+      "temp": 0,
+      "info": false,
+      "bounds": {
+        "left": 1800,
+        "top": 400,
+        "width": 700,
+        "height": 400
+      }
+    },
+    {
+      "source": "1050",
+      "title": "1050nm单环吸光度",
+      "temp": 0,
+      "info": false,
+      "bounds": {
+        "left": 1100,
+        "top": 1800,
+        "width": 1750,
+        "height": 340
+      },
+      "key": "1050_copy",
+      "ignore_series": []
+    },
+    {
+      "source": "1314",
+      "title": "1314nm单环吸光度",
+      "temp": 0,
+      "info": false,
+      "bounds": {
+        "left": 2500,
+        "top": 400,
+        "width": 700,
+        "height": 400
+      }
+    },
+    {
+      "source": "Diff34",
+      "title": "34环差分信号vs.加热功率",
+      "temp": 15,
+      "info": true,
+      "bounds": {
+        "left": 400,
+        "top": 800,
+        "width": 700,
+        "height": 400
+      }
+    },
+    {
+      "source": "Diff45",
+      "title": "45环差分信号vs.测头相对扶手高度(cm)",
+      "temp": 33,
+      "info": true,
+      "bounds": {
+        "left": 1100,
+        "top": 800,
+        "width": 700,
+        "height": 400
+      }
+    },
+    {
+      "source": "1219",
+      "title": "1219nm单环吸光度",
+      "temp": 0,
+      "info": true,
+      "bounds": {
+        "left": 1800,
+        "top": 800,
+        "width": 700,
+        "height": 400
+      }
+    },
+    {
+      "source": "1219",
+      "title": "1219nm单环吸光度",
+      "temp": 0,
+      "info": true,
+      "bounds": {
+        "left": 2850,
+        "top": 1800,
+        "width": 700,
+        "height": 340
+      },
+      "key": "1219_copy",
+      "ignore_series": []
+    },
+    {
+      "source": "1409",
+      "title": "1409nm单环吸光度",
+      "temp": 0,
+      "info": true,
+      "bounds": {
+        "left": 2500,
+        "top": 800,
+        "width": 700,
+        "height": 400
+      }
+    },
+    {
+      "source": "Diff1050",
+      "title": "1050nm差分吸光度",
+      "temp": 33,
+      "info": false,
+      "bounds": {
+        "left": 400,
+        "top": 1200,
+        "width": 700,
+        "height": 400
+      }
+    },
+    {
+      "source": "Diff1050",
+      "title": "1050nm差分吸光度",
+      "temp": 33,
+      "info": false,
+      "bounds": {
+        "left": 1100,
+        "top": 2480,
+        "width": 1750,
+        "height": 340
+      },
+      "key": "Diff1050_copy",
+      "ignore_series": []
+    },
+    {
+      "source": "Diff1219",
+      "title": "1219nm差分吸光度vs.测头下实际温度",
+      "temp": 12,
+      "info": true,
+      "bounds": {
+        "left": 1100,
+        "top": 1200,
+        "width": 700,
+        "height": 400
+      }
+    },
+    {
+      "source": "Diff1219",
+      "title": "1219nm差分吸光度vs.测头下实际温度",
+      "temp": 12,
+      "info": true,
+      "bounds": {
+        "left": 2850,
+        "top": 2140,
+        "width": 700,
+        "height": 340
+      },
+      "key": "Diff1219_copy",
+      "ignore_series": []
+    },
+    {
+      "source": "1550",
+      "title": "1550nm单环吸光度",
+      "temp": 0,
+      "info": false,
+      "bounds": {
+        "left": 1800,
+        "top": 1200,
+        "width": 700,
+        "height": 400
+      }
+    },
+    {
+      "source": "1550",
+      "title": "1550nm单环吸光度",
+      "temp": 0,
+      "info": false,
+      "bounds": {
+        "left": 1100,
+        "top": 2140,
+        "width": 1750,
+        "height": 340
+      },
+      "key": "1550_copy",
+      "ignore_series": []
+    },
+    {
+      "source": "Diff1550",
+      "title": "1550nm差分吸光度",
+      "temp": 0,
+      "info": true,
+      "bounds": {
+        "left": 1100,
+        "top": 2820,
+        "width": 1750,
+        "height": 340
+      },
+      "key": "Diff1550_copy",
+      "ignore_series": []
+    },
+    {
+      "source": "Diff1550-Diff1050",
+      "title": "Diff1550-Diff1050",
+      "temp": 0,
+      "info": false,
+      "bounds": {
+        "left": 2500,
+        "top": 1200,
+        "width": 700,
+        "height": 400
+      }
+    },
+    {
+      "source": "Diff1550-Diff1050",
+      "title": "Diff1550-Diff1050",
+      "temp": 0,
+      "info": false,
+      "bounds": {
+        "left": 1100,
+        "top": 3160,
+        "width": 1750,
+        "height": 340
+      },
+      "key": "Diff1550-Diff1050_copy",
+      "ignore_series": []
+    },
+    {
+      "source": "1609",
+      "title": "1609nm单环吸光度",
+      "temp": 0,
+      "info": false,
+      "bounds": {
+        "left": 2500,
+        "top": 1200,
+        "width": 700,
+        "height": 400
+      },
+      "temp_correlation": {
+        "corrected": {
+          "source": "Diff1550-Diff1050-temp",
+          "title": "温度校正后的波长差分",
+          "temp": 0,
+          "bounds": {
+            "left": 2500,
+            "top": 1200,
+            "width": 700,
+            "height": 400
+          }
+        },
+        "original": {
+          "bounds": {
+            "left": 2500,
+            "top": 1200,
+            "width": 700,
+            "height": 400
+          }
+        }
+      }
+    }
+  ]
+}
