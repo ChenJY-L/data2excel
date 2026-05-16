@@ -418,10 +418,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             self.Path.setPlainText(max(self.FilePath(path, filekwords), self.FilePath(path, filekwordsC)))
 
         # 确定环数
-        if self.Rings.currentText() == '5 Rings':
-            Ch = 5
-        elif self.Rings.currentText() == '7 Rings':
-            Ch = 7
+        Ch = int(self.Rings.currentText()[0])
 
         # 获取各环数据
         self.GuiRefresh(self.Status, 'Loading Data')
@@ -2169,7 +2166,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 waveIndex = wave.index(each[-4:]) + 1
                 ytitle = 'ΔAd'
                 pairs = [(i, i + 1) for i in range(1, Ch)]  # 相邻：12,23,34...
-                pairs.append((3, 5))  # 添加35环
+                if Ch == 5: pairs.append((3, 5))  # 添加35环
 
                 for a, b in pairs:
                     target = f'Diff{a}{b}'
@@ -2183,7 +2180,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 wave1, wave2 = each[4:8], each[13:17]
                 waveIndex1, waveIndex2 = wave.index(wave1) + 1, wave.index(wave2) + 1
 
-                targets = ['Diff12', 'Diff23', 'Diff34', 'Diff35', 'Diff45']
+                targets = ['Diff12', 'Diff23', 'Diff34', 'Diff35', 'Diff45'] if Ch == 5 else ['Diff12', 'Diff23', 'Diff34']
                 if self.classicCheckBox.isChecked():
                     targets.remove(targets[3])  # 经典模式关闭Diff35
 
@@ -2426,7 +2423,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 chartApi.FullSeriesCollection(ignore_index).IsFiltered = True
 
             for overlay_cfg in chart_plan[p].get("extra_series", []):
-                if overlay_cfg.get("enabled", True):
+                if overlay_cfg.get("enabled", True) and Ch == 5:    # 暂时仅设置Ch==5时，启动overlay
                     self._add_target_series_to_main_axis(
                         wavelength=overlay_cfg.get("wavelength"),
                         target_id=overlay_cfg.get("target_id"),

@@ -31,7 +31,8 @@ class Ui_Data_Processing(object):
         self.Rings.setGeometry(QtCore.QRect(10, 25, 100, 25))
         self.Rings.setFont(font)
         self.Rings.setObjectName("Rings")
-        self.Rings.addItems(["5 Rings", "7 Rings"])
+        self.Rings.addItems(["4 Rings", "5 Rings", "7 Rings"])
+        self.Rings.setCurrentIndex(1)
 
         # 数据类型选择
         self.Original = QtWidgets.QComboBox(self.dataInputGroup)
