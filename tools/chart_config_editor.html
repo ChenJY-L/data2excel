@@ -1,0 +1,2098 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chart Config Editor</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --text: #172033;
+      --muted: #667085;
+      --line: #d7dde8;
+      --accent: #2563eb;
+      --accent-weak: #dbeafe;
+      --chart: #0f766e;
+      --chart-bg: rgba(15, 118, 110, 0.16);
+      --annotation: #7c3aed;
+      --annotation-bg: rgba(124, 58, 237, 0.13);
+      --danger: #b91c1c;
+      --warning: #b45309;
+      --shadow: 0 10px 24px rgba(23, 32, 51, 0.08);
+      font-family: "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    button, input, select, textarea { font: inherit; }
+
+    button, .file-button {
+      min-height: 28px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--text);
+      padding: 4px 9px;
+      cursor: pointer;
+    }
+
+    button:hover, .file-button:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    button.primary:hover { color: #fff; opacity: 0.92; }
+    button.danger { color: var(--danger); }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+    }
+
+    button:disabled:hover {
+      border-color: var(--line);
+      color: var(--text);
+    }
+
+    input, select, textarea {
+      width: 100%;
+      min-height: 28px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--text);
+      padding: 4px 8px;
+    }
+
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+      font-family: Consolas, "Cascadia Mono", monospace;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    label {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 2px;
+    }
+
+    .app {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-height: 100vh;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      flex-wrap: wrap;
+    }
+
+    .toolbar h1 {
+      font-size: 16px;
+      margin: 0 8px 0 0;
+      white-space: nowrap;
+    }
+
+    .toolbar-group {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .toolbar .spacer { flex: 1; }
+    .hidden-input { display: none; }
+
+    .toolbar-divider {
+      width: 1px;
+      align-self: stretch;
+      background: var(--line);
+      margin: 0 4px;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 240px minmax(520px, 1fr) 272px;
+      gap: 10px;
+      padding: 10px;
+      min-height: 0;
+    }
+
+    .panel {
+      min-height: 0;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 36px;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-header strong { font-size: 13px; }
+
+    .panel-body {
+      padding: 10px;
+      overflow: auto;
+      flex: 1;
+    }
+
+    .stack { display: grid; gap: 8px; }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .field-card {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 8px 10px 10px;
+      background: #fbfcfe;
+      display: grid;
+      gap: 6px;
+    }
+
+    .field-card-title {
+      margin: -1px 0 1px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .inspector {
+      align-self: start;
+      max-height: 100%;
+    }
+
+    .inspector label {
+      margin-bottom: 2px;
+    }
+
+    .section-title {
+      margin: 8px 0 4px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .item-list { display: grid; gap: 6px; }
+
+    .item {
+      width: 100%;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 8px;
+      align-items: center;
+      min-height: 30px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      padding: 4px 8px;
+      text-align: left;
+    }
+
+    .item.active {
+      border-color: var(--accent);
+      background: var(--accent-weak);
+    }
+
+    .item small {
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .item-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .item-dot.annotation { background: var(--annotation); }
+    .item-dot.chart { background: var(--chart); }
+
+    .badge, .selection-meta {
+      border-radius: 999px;
+      font-size: 11px;
+      padding: 2px 7px;
+      white-space: nowrap;
+    }
+
+    .badge { background: #eef2ff; color: #3730a3; }
+
+    .selection-meta {
+      background: #f1f5f9;
+      color: var(--muted);
+    }
+
+    .board-panel { min-height: 0; }
+
+    .board-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfe;
+    }
+
+    .board-toolbar .toolbar-field {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .board-toolbar .toolbar-field label {
+      margin: 0;
+      white-space: nowrap;
+    }
+
+    .board-toolbar input[type="number"] { width: 64px; }
+    .board-toolbar input[type="range"] { width: 130px; }
+    .board-toolbar button { min-width: 36px; padding: 4px 9px; }
+
+    .board-shell {
+      min-height: 0;
+      flex: 1;
+      overflow: auto;
+      outline: none;
+      background:
+        linear-gradient(#eef2f7 1px, transparent 1px),
+        linear-gradient(90deg, #eef2f7 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+
+    .board {
+      position: relative;
+      margin: 18px;
+      min-width: 1600px;
+      min-height: 1200px;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+      transform-origin: top left;
+    }
+
+    .rect {
+      position: absolute;
+      border: 2px solid var(--chart);
+      background: var(--chart-bg);
+      border-radius: 6px;
+      min-width: 24px;
+      min-height: 20px;
+      color: #052e2b;
+      cursor: move;
+      user-select: none;
+      touch-action: none;
+      overflow: hidden;
+    }
+
+    .rect.annotation {
+      border-color: var(--annotation);
+      background: var(--annotation-bg);
+      color: #2e1065;
+    }
+
+    .rect.selected {
+      outline: 3px solid rgba(37, 99, 235, 0.32);
+      z-index: 5;
+    }
+
+    .rect-label {
+      padding: 5px 7px;
+      font-size: 12px;
+      line-height: 1.25;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    .rect-label strong, .rect-label small {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .axis-badge {
+      display: inline-block;
+      margin-top: 4px;
+      max-width: 100%;
+      border-radius: 999px;
+      background: rgba(37, 99, 235, 0.12);
+      color: #1d4ed8;
+      font-size: 11px;
+      line-height: 1.2;
+      padding: 2px 6px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      vertical-align: top;
+    }
+
+    .selection-marquee {
+      position: absolute;
+      border: 1px solid var(--accent);
+      background: rgba(37, 99, 235, 0.12);
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .resize-handle {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      width: 13px;
+      height: 13px;
+      border-left: 2px solid rgba(23, 32, 51, 0.3);
+      border-top: 2px solid rgba(23, 32, 51, 0.3);
+      background: rgba(255, 255, 255, 0.78);
+      cursor: nwse-resize;
+    }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    .check-row input {
+      width: auto;
+      min-height: auto;
+    }
+
+    select[multiple] { min-height: 110px; }
+
+    /* Bottom drawer */
+    .drawer {
+      background: var(--panel);
+      border-top: 1px solid var(--line);
+      box-shadow: 0 -4px 16px rgba(23, 32, 51, 0.06);
+      transition: max-height 0.18s ease;
+      max-height: 320px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .drawer.collapsed { max-height: 0; border-top: none; }
+
+    .drawer-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .drawer-body {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 10px;
+      padding: 10px 12px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .drawer-body textarea {
+      width: 100%;
+      height: 100%;
+      min-height: 140px;
+    }
+
+    .validation-panel {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #f8fafc;
+      padding: 8px 10px;
+      font-size: 12px;
+      line-height: 1.45;
+      overflow: auto;
+      min-height: 140px;
+    }
+
+    .validation-panel ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .validation-ok { color: var(--chart); }
+    .validation-error { color: var(--danger); }
+    .validation-warning { color: var(--warning); }
+
+    /* Floating toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      max-width: 360px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: #172033;
+      color: #fff;
+      font-size: 13px;
+      box-shadow: 0 12px 28px rgba(23, 32, 51, 0.25);
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.18s ease, transform 0.18s ease;
+      pointer-events: none;
+      z-index: 50;
+    }
+
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.error { background: var(--danger); }
+
+    @media (max-width: 1180px) {
+      .workspace { grid-template-columns: 240px 1fr; }
+      .inspector { grid-column: 1 / -1; }
+      .drawer-body { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="toolbar">
+      <h1>Chart Config Editor</h1>
+
+      <div class="toolbar-group">
+        <button id="openJson" title="打开 JSON 文件">打开</button>
+        <input class="hidden-input" id="jsonFile" type="file" accept=".json,application/json">
+        <button id="saveJson" class="primary" title="保存到当前打开的 JSON 文件">保存</button>
+        <button id="saveJsonAs" title="另存为新的 JSON 文件">另存为</button>
+      </div>
+
+      <span class="toolbar-divider"></span>
+
+      <div class="toolbar-group">
+        <button id="undoBtn" title="撤销 (Ctrl+Z)">↶ 撤销</button>
+        <button id="redoBtn" title="重做 (Ctrl+Y / Ctrl+Shift+Z)">↷ 重做</button>
+      </div>
+
+      <span class="toolbar-divider"></span>
+
+      <div class="toolbar-group">
+        <button id="addChart" title="新增图表">+ 图表</button>
+        <button id="addAnnotation" title="新增标注">+ 标注</button>
+        <button id="duplicateSelection" title="复制选中 (Ctrl+C)">复制</button>
+        <button id="deleteSelected" class="danger" title="删除选中 (Del)">删除</button>
+      </div>
+
+      <span class="spacer"></span>
+
+      <button id="flattenDuplicates" title="将旧 duplicate 字段拆分为独立图表">迁移旧副图</button>
+      <button id="toggleDrawer" title="展开/收起 JSON 与校验面板">JSON / 校验</button>
+    </header>
+
+    <main class="workspace">
+      <aside class="panel">
+        <div class="panel-header">
+          <strong>对象</strong>
+          <select id="chartCollection">
+            <option value="charts">默认图表</option>
+            <option value="classic_charts">Classic 图表</option>
+          </select>
+        </div>
+        <div class="panel-body">
+          <div class="section-title">标注</div>
+          <div class="item-list" id="annotationList"></div>
+          <div class="section-title">图表</div>
+          <div class="item-list" id="chartList"></div>
+        </div>
+      </aside>
+
+      <section class="panel board-panel">
+        <div class="board-toolbar">
+          <div class="toolbar-field">
+            <label for="zoomInput">缩放</label>
+            <input id="zoomInput" type="range" min="0.12" max="0.8" step="0.02" value="0.28">
+          </div>
+          <label class="check-row">
+            <input id="snapInput" type="checkbox" checked>吸附
+          </label>
+          <div class="toolbar-field">
+            <label for="snapSizeInput">网格</label>
+            <input id="snapSizeInput" type="number" min="1" step="1" value="10">
+          </div>
+          <div class="toolbar-field">
+            <label for="nudgeStepInput">微调</label>
+            <input id="nudgeStepInput" type="number" min="1" step="1" value="10">
+          </div>
+
+          <span class="toolbar-divider"></span>
+
+          <button id="selectAllVisible" title="全选 (Ctrl+A)">全选</button>
+          <button id="clearSelection" title="清空选择 (Esc)">清空</button>
+          <button id="fitView" title="适配视图">适配</button>
+
+          <span class="toolbar-divider"></span>
+
+          <button id="alignLeft">左齐</button>
+          <button id="alignCenter">中齐</button>
+          <button id="alignRight">右齐</button>
+          <button id="alignTop">顶齐</button>
+          <button id="alignMiddle">垂齐</button>
+          <button id="alignBottom">底齐</button>
+
+          <span class="toolbar-divider"></span>
+
+          <button id="sameWidth">同宽</button>
+          <button id="sameHeight">同高</button>
+          <button id="distributeHorizontal">横分布</button>
+          <button id="distributeVertical">竖分布</button>
+        </div>
+
+        <div class="board-shell" id="boardShell" tabindex="0">
+          <div class="board" id="layoutBoard"></div>
+        </div>
+      </section>
+
+      <aside class="panel inspector">
+        <div class="panel-header">
+          <strong id="selectionTitle">属性</strong>
+          <span class="selection-meta" id="selectionKind">未选择</span>
+          <span class="selection-meta" id="selectionCount">已选 0</span>
+        </div>
+        <div class="panel-body stack">
+          <div class="field-card">
+            <div class="field-card-title">位置 / 尺寸</div>
+            <div class="field-grid">
+              <div>
+                <label for="leftInput">左边距</label>
+                <input id="leftInput" type="number" step="1">
+              </div>
+              <div>
+                <label for="topInput">顶部</label>
+                <input id="topInput" type="number" step="1">
+              </div>
+              <div>
+                <label for="widthInput">宽度</label>
+                <input id="widthInput" type="number" step="1">
+              </div>
+              <div>
+                <label for="heightInput">高度</label>
+                <input id="heightInput" type="number" step="1">
+              </div>
+            </div>
+          </div>
+
+          <div id="chartFields" class="stack">
+            <div class="field-card">
+              <div class="field-card-title">图表</div>
+              <div>
+                <label for="sourceInput">数据源</label>
+                <select id="sourceInput"></select>
+              </div>
+              <div>
+                <label for="titleInput">标题</label>
+                <input id="titleInput" type="text">
+              </div>
+              <label class="check-row">
+                <input id="infoInput" type="checkbox">显示信息
+              </label>
+            </div>
+
+            <div class="field-card">
+              <div class="field-card-title">次坐标轴</div>
+              <div>
+                <label for="secondaryKindInput">类型</label>
+                <select id="secondaryKindInput">
+                  <option value="none">无</option>
+                  <option value="temp_col">温度 · 按列号</option>
+                  <option value="temp_header">温度 · 按表头</option>
+                  <option value="glucose">血糖</option>
+                  <option value="spectral">光谱</option>
+                </select>
+              </div>
+              <div id="secondaryColumnField">
+                <label for="secondaryColumnInput">列号</label>
+                <select id="secondaryColumnInput"></select>
+              </div>
+              <div id="secondaryHeaderField" class="field-grid">
+                <div>
+                  <label for="secondaryHeaderInput">表头</label>
+                  <select id="secondaryHeaderInput"></select>
+                </div>
+                <div>
+                  <label for="secondaryFallbackInput">备用列号</label>
+                  <input id="secondaryFallbackInput" type="number" min="1" step="1">
+                </div>
+              </div>
+              <div id="secondarySpectralFields">
+                <label for="secondarySeriesInput">光谱序列</label>
+                <select id="secondarySeriesInput" multiple></select>
+              </div>
+            </div>
+
+            <div class="field-card">
+              <div class="field-card-title">序列</div>
+              <div>
+                <label for="ignoreSeriesInput">忽略序列</label>
+                <input id="ignoreSeriesInput" type="text" placeholder="逗号分隔列号">
+              </div>
+              <div>
+                <label for="extraSeriesInput">附加序列 (JSON)</label>
+                <textarea id="extraSeriesInput"></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="drawer collapsed" id="drawer">
+      <div class="drawer-header">
+        <strong>JSON 与 校验</strong>
+        <span class="spacer"></span>
+        <button id="applyJson">应用文本</button>
+        <button id="copyJson">复制 JSON</button>
+        <button id="closeDrawer">收起</button>
+      </div>
+      <div class="drawer-body">
+        <textarea id="jsonOutput" spellcheck="false"></textarea>
+        <div class="validation-panel" id="validationPanel"></div>
+      </div>
+    </footer>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const RING_NUMBERS = [1, 2, 3, 4, 5, 6, 7];
+    const RING_SOURCE_OPTIONS = RING_NUMBERS.map((ring) => ({
+      value: `Ring-${ring}`,
+      label: `Ring ${ring} 全波长`
+    }));
+
+    const CHART_SOURCE_OPTIONS = [
+      { value: "Diff12", label: "Diff12" },
+      { value: "Diff23", label: "Diff23" },
+      { value: "Diff34", label: "Diff34" },
+      { value: "Diff35", label: "Diff35" },
+      { value: "Diff45", label: "Diff45" },
+      { value: "1050", label: "1050 nm 单环" },
+      { value: "1219", label: "1219 nm 单环" },
+      { value: "1314", label: "1314 nm 单环" },
+      { value: "1409", label: "1409 nm 单环" },
+      { value: "1550", label: "1550 nm 单环" },
+      { value: "1609", label: "1609 nm 单环" },
+      ...RING_SOURCE_OPTIONS,
+      { value: "Diff1050", label: "Diff1050" },
+      { value: "Diff1219", label: "Diff1219" },
+      { value: "Diff1314", label: "Diff1314" },
+      { value: "Diff1409", label: "Diff1409" },
+      { value: "Diff1550", label: "Diff1550" },
+      { value: "Diff1609", label: "Diff1609" },
+      { value: "Diff1550-Diff1050", label: "Diff1550-Diff1050" },
+      { value: "Diff1550-Diff1050-temp", label: "Diff1550-Diff1050-temp" },
+      { value: "Diff1550-Diff1050-kDiff1219", label: "Diff1550-Diff1050-kDiff1219" }
+    ];
+
+    const TEMPERATURE_AXIS_OPTIONS = [
+      "Default1", "Default2", "Default3", "Default4", "Default5",
+      "Default6", "Default7", "Default8",
+      "TC1控制温度", "TC1实际温度", "TC1实际输出电压", "TC1实际输出电流", "TC1实际输出功率",
+      "TC2控制温度", "TC2实际温度", "TC2实际输出电压", "TC2实际输出电流", "TC2实际输出功率",
+      "压力(电压值)", "压力(g)", "Zolix电机位置", "Zolix电机速度", "步进电机当前位置",
+      "温度", "湿度",
+      "LD设定温度(度)", "LD实际温度(度)", "LD设定温度(脉冲值)", "LD实际温度(脉冲值)",
+      "LD PWM(功率)", "相对高度(cm)"
+    ].map((label, index) => ({ value: String(index + 3), label }));
+
+    const SPECTRAL_SERIES_OPTIONS = [
+      "1050", "1219", "1314", "1409", "1550", "1609",
+      "Diff1050", "Diff1219", "Diff1550"
+    ].map((value) => ({ value, label: value }));
+
+    const JSON_FILE_TYPES = [{
+      description: "JSON 文件",
+      accept: { "application/json": [".json"] }
+    }];
+
+    const MARQUEE_START_PX = 6;
+    const HISTORY_LIMIT = 50;
+
+    const state = {
+      config: {
+        version: 1,
+        annotations: {
+          title_box: { left: 400, top: 300, width: 2100, height: 100 },
+          duplicate_title_box: { left: 1100, top: 1700, width: 1750, height: 100 },
+          remark_box: { left: 1800, top: 800, width: 350, height: 400 },
+          classic_remark_box: { left: 2850, top: 1800, width: 350, height: 400 }
+        },
+        charts: [],
+        classic_charts: []
+      },
+      collection: "charts",
+      selected: { type: "annotation", key: "title_box" },
+      selection: [{ type: "annotation", key: "title_box" }],
+      scale: 0.28,
+      drag: null,
+      pendingMarquee: null,
+      marquee: null,
+      fileHandle: null,
+      fileName: "chart_config.json",
+      history: { past: [], future: [] },
+      toastTimer: null
+    };
+
+    const el = {};
+    [
+      "openJson", "jsonFile", "saveJson", "saveJsonAs", "applyJson",
+      "addChart", "duplicateSelection", "addAnnotation",
+      "deleteSelected", "flattenDuplicates", "copyJson",
+      "chartCollection", "annotationList", "chartList", "boardShell", "layoutBoard",
+      "zoomInput", "snapInput", "snapSizeInput", "nudgeStepInput", "selectionTitle",
+      "selectionKind", "selectionCount", "validationPanel", "leftInput", "topInput",
+      "widthInput", "heightInput", "sourceInput", "titleInput",
+      "infoInput", "ignoreSeriesInput", "extraSeriesInput",
+      "secondaryKindInput", "secondaryColumnField", "secondaryColumnInput",
+      "secondaryHeaderField", "secondaryHeaderInput", "secondaryFallbackInput",
+      "secondarySpectralFields", "secondarySeriesInput",
+      "chartFields", "jsonOutput", "toast", "drawer", "toggleDrawer", "closeDrawer",
+      "undoBtn", "redoBtn",
+      "selectAllVisible", "clearSelection", "fitView", "alignLeft",
+      "alignCenter", "alignRight", "alignTop", "alignMiddle", "alignBottom",
+      "sameWidth", "sameHeight", "distributeHorizontal", "distributeVertical"
+    ].forEach((id) => {
+      el[id] = document.getElementById(id);
+    });
+
+    function populateFixedOptions() {
+      setSelectOptions(el.sourceInput, CHART_SOURCE_OPTIONS);
+      setSelectOptions(el.secondaryColumnInput, TEMPERATURE_AXIS_OPTIONS);
+      setSelectOptions(
+        el.secondaryHeaderInput,
+        TEMPERATURE_AXIS_OPTIONS.map((item) => ({ value: item.label, label: item.label }))
+      );
+      setSelectOptions(el.secondarySeriesInput, SPECTRAL_SERIES_OPTIONS);
+    }
+
+    function setSelectOptions(select, options) {
+      select.innerHTML = "";
+      options.forEach((item) => {
+        const option = document.createElement("option");
+        option.value = item.value;
+        option.textContent = item.label;
+        select.appendChild(option);
+      });
+    }
+
+    function ensureSelectOption(select, value, label = value) {
+      const text = String(value ?? "");
+      if (!text) return;
+      const exists = Array.from(select.options).some((option) => option.value === text);
+      if (exists) return;
+      const option = document.createElement("option");
+      option.value = text;
+      option.textContent = `${label} (当前)`;
+      select.appendChild(option);
+    }
+
+    function selectedMultiValues(select) {
+      return Array.from(select.selectedOptions).map((option) => option.value);
+    }
+
+    function setMultiSelectValues(select, values) {
+      const set = new Set((values || []).map((item) => String(item)));
+      set.forEach((value) => ensureSelectOption(select, value));
+      Array.from(select.options).forEach((option) => {
+        option.selected = set.has(option.value);
+      });
+    }
+
+    function optionLabel(options, value) {
+      const text = String(value ?? "");
+      const option = options.find((item) => item.value === text);
+      return option ? option.label : "";
+    }
+
+    function temperatureAxisLabel(value) {
+      return optionLabel(TEMPERATURE_AXIS_OPTIONS, value) || String(value ?? "");
+    }
+
+    function clone(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    /* ---------- History (Undo/Redo) ---------- */
+
+    function pushHistory() {
+      state.history.past.push(JSON.stringify(state.config));
+      if (state.history.past.length > HISTORY_LIMIT) state.history.past.shift();
+      state.history.future.length = 0;
+      updateUndoRedoButtons();
+    }
+
+    function undo() {
+      if (!state.history.past.length) return;
+      state.history.future.push(JSON.stringify(state.config));
+      state.config = JSON.parse(state.history.past.pop());
+      setSelection(state.selection, state.selected);
+      updateUndoRedoButtons();
+      setStatus("已撤销");
+    }
+
+    function redo() {
+      if (!state.history.future.length) return;
+      state.history.past.push(JSON.stringify(state.config));
+      state.config = JSON.parse(state.history.future.pop());
+      setSelection(state.selection, state.selected);
+      updateUndoRedoButtons();
+      setStatus("已重做");
+    }
+
+    function updateUndoRedoButtons() {
+      el.undoBtn.disabled = !state.history.past.length;
+      el.redoBtn.disabled = !state.history.future.length;
+    }
+
+    /* ---------- Config / selection helpers ---------- */
+
+    function currentCharts() {
+      if (!Array.isArray(state.config[state.collection])) {
+        state.config[state.collection] = [];
+      }
+      return state.config[state.collection];
+    }
+
+    function normalizeConfig(config) {
+      const next = clone(config || {});
+      next.version = next.version || 1;
+      next.annotations = next.annotations || {};
+      next.charts = flattenLegacyDuplicates(Array.isArray(next.charts) ? next.charts : []);
+      next.classic_charts = flattenLegacyDuplicates(Array.isArray(next.classic_charts) ? next.classic_charts : []);
+      [...next.charts, ...next.classic_charts].forEach((chart) => {
+        chart.bounds = normalizeBounds(chart.bounds);
+      });
+      Object.keys(next.annotations).forEach((key) => {
+        next.annotations[key] = normalizeBounds(next.annotations[key]);
+      });
+      return next;
+    }
+
+    function flattenLegacyDuplicates(charts) {
+      const output = [];
+      charts.forEach((chart) => {
+        const duplicate = chart?.duplicate;
+        if (!(duplicate && duplicate.enabled)) {
+          const item = clone(chart);
+          delete item.duplicate;
+          output.push(item);
+          return;
+        }
+
+        if (!duplicate.delete_original) {
+          const original = clone(chart);
+          delete original.duplicate;
+          output.push(original);
+        }
+
+        const copy = clone(chart);
+        delete copy.duplicate;
+        copy.bounds = normalizeBounds(duplicate.bounds || chart.bounds);
+        copy.key = uniqueChartKey(copy.key || copy.source || "chart", output);
+        if (duplicate.ignore_series !== undefined) {
+          copy.ignore_series = Array.isArray(duplicate.ignore_series) ? duplicate.ignore_series : [];
+        }
+        if (duplicate.extra_series !== undefined) {
+          copy.extra_series = clone(duplicate.extra_series || []);
+        }
+        output.push(copy);
+      });
+      return output;
+    }
+
+    function normalizeBounds(bounds) {
+      const source = bounds || {};
+      return {
+        left: Number(source.left || 0),
+        top: Number(source.top || 0),
+        width: Math.max(1, Number(source.width || 700)),
+        height: Math.max(1, Number(source.height || 400))
+      };
+    }
+
+    function selectionKey(selection) {
+      if (!selection) return "";
+      return selection.type === "annotation"
+        ? `annotation:${selection.key}`
+        : `chart:${selection.index}`;
+    }
+
+    function sameSelection(left, right) {
+      return selectionKey(left) === selectionKey(right);
+    }
+
+    function isSelected(selection) {
+      return state.selection.some((item) => sameSelection(item, selection));
+    }
+
+    function cleanSelection(selection = state.selection) {
+      return selection.filter((item) => Boolean(boundsOf(item)));
+    }
+
+    function setSelection(selection, primary) {
+      const seen = new Set();
+      state.selection = cleanSelection(selection).filter((item) => {
+        const key = selectionKey(item);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      state.selected = primary && boundsOf(primary) ? primary : (state.selection[state.selection.length - 1] || null);
+      render();
+    }
+
+    function select(selection, additive = false) {
+      if (!additive) {
+        setSelection([selection], selection);
+        return;
+      }
+      if (isSelected(selection)) {
+        setSelection(state.selection.filter((item) => !sameSelection(item, selection)));
+      } else {
+        setSelection([...state.selection, selection], selection);
+      }
+    }
+
+    function boundsOf(selection = state.selected) {
+      if (!selection) return null;
+      if (selection.type === "annotation") {
+        return state.config.annotations?.[selection.key] || null;
+      }
+      return currentCharts()[selection.index]?.bounds || null;
+    }
+
+    function selectedChart() {
+      if (state.selected?.type !== "chart" || selectedItems().length !== 1) return null;
+      return currentCharts()[state.selected.index] || null;
+    }
+
+    function selectedItems() {
+      return cleanSelection().map((selection) => ({
+        selection,
+        bounds: boundsOf(selection),
+        chart: selection.type === "chart" ? currentCharts()[selection.index] : null
+      }));
+    }
+
+    function allVisibleSelections() {
+      const annotations = Object.keys(state.config.annotations || {}).map((key) => ({ type: "annotation", key }));
+      const charts = currentCharts().map((_, index) => ({ type: "chart", index }));
+      return [...annotations, ...charts];
+    }
+
+    /* ---------- Toast ---------- */
+
+    function setStatus(message, type = "info") {
+      if (!message) {
+        el.toast.classList.remove("show");
+        return;
+      }
+      el.toast.textContent = message;
+      el.toast.classList.toggle("error", type === "error");
+      el.toast.classList.add("show");
+      clearTimeout(state.toastTimer);
+      state.toastTimer = setTimeout(() => el.toast.classList.remove("show"), 2400);
+    }
+
+    /* ---------- Render ---------- */
+
+    function render() {
+      state.selection = cleanSelection();
+      if (state.selected && !boundsOf(state.selected)) {
+        state.selected = state.selection[state.selection.length - 1] || null;
+      }
+      renderLists();
+      renderBoard();
+      renderInspector();
+      renderValidationPanel();
+      syncJson();
+      updateUndoRedoButtons();
+    }
+
+    function renderLists() {
+      el.annotationList.innerHTML = "";
+      Object.keys(state.config.annotations || {}).forEach((key) => {
+        el.annotationList.appendChild(makeListItem(
+          { type: "annotation", key }, key, "annotation"
+        ));
+      });
+
+      el.chartList.innerHTML = "";
+      currentCharts().forEach((chart, index) => {
+        el.chartList.appendChild(makeListItem(
+          { type: "chart", index },
+          chart.title || chart.source || `图表 ${index + 1}`,
+          chart.source || "chart"
+        ));
+      });
+    }
+
+    function makeListItem(selection, title, badge) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `item${isSelected(selection) ? " active" : ""}`;
+      const dotClass = selection.type === "annotation" ? "annotation" : "chart";
+      button.innerHTML =
+        `<span class="item-dot ${dotClass}"></span>` +
+        `<small>${escapeHtml(title)}</small>` +
+        `<span class="badge">${escapeHtml(badge)}</span>`;
+      button.addEventListener("click", (event) => select(selection, event.shiftKey || event.ctrlKey || event.metaKey));
+      return button;
+    }
+
+    function renderBoard() {
+      const rects = [];
+      Object.entries(state.config.annotations || {}).forEach(([key, bounds]) => {
+        rects.push({ selection: { type: "annotation", key }, bounds, label: key, className: "annotation" });
+      });
+      currentCharts().forEach((chart, index) => {
+        rects.push({
+          selection: { type: "chart", index },
+          bounds: chart.bounds,
+          label: chart.source || chart.title || `图表 ${index + 1}`,
+          axisLabel: secondaryAxisLabel(chart),
+          className: "chart"
+        });
+      });
+
+      const maxRight = Math.max(1600, ...rects.map((item) => item.bounds.left + item.bounds.width + 180));
+      const maxBottom = Math.max(1200, ...rects.map((item) => item.bounds.top + item.bounds.height + 180));
+      el.layoutBoard.style.width = `${maxRight * state.scale}px`;
+      el.layoutBoard.style.height = `${maxBottom * state.scale}px`;
+      el.layoutBoard.innerHTML = "";
+
+      rects.forEach((item) => {
+        const rect = document.createElement("div");
+        rect.className = `rect ${item.className}${isSelected(item.selection) ? " selected" : ""}`;
+        rect.style.left = `${item.bounds.left * state.scale}px`;
+        rect.style.top = `${item.bounds.top * state.scale}px`;
+        rect.style.width = `${item.bounds.width * state.scale}px`;
+        rect.style.height = `${item.bounds.height * state.scale}px`;
+        rect.dataset.selection = JSON.stringify(item.selection);
+        const axisHtml = item.axisLabel
+          ? `<span class="axis-badge">${escapeHtml(item.axisLabel)}</span>`
+          : "";
+        rect.innerHTML = `<div class="rect-label"><strong>${escapeHtml(item.label)}</strong>${axisHtml}</div><div class="resize-handle"></div>`;
+        rect.addEventListener("pointerdown", onRectPointerDown);
+        el.layoutBoard.appendChild(rect);
+      });
+
+      if (state.marquee) renderMarquee();
+    }
+
+    function renderInspector() {
+      const items = selectedItems();
+      const oneItem = items.length === 1 ? items[0] : null;
+      const chart = selectedChart();
+      const bounds = oneItem?.bounds || null;
+
+      el.selectionTitle.textContent = items.length > 1
+        ? `${items.length} 个对象`
+        : oneItem ? selectionLabel(oneItem.selection) : "属性";
+      el.selectionKind.textContent = items.length > 1 ? "多选" : selectedTypeLabel();
+      el.selectionCount.textContent = `已选 ${items.length}`;
+
+      [el.leftInput, el.topInput, el.widthInput, el.heightInput].forEach((input) => {
+        input.disabled = !bounds;
+      });
+      el.leftInput.value = bounds ? round(bounds.left) : "";
+      el.topInput.value = bounds ? round(bounds.top) : "";
+      el.widthInput.value = bounds ? round(bounds.width) : "";
+      el.heightInput.value = bounds ? round(bounds.height) : "";
+
+      el.chartFields.style.display = chart ? "grid" : "none";
+      if (chart) {
+        ensureSelectOption(el.sourceInput, chart.source || "");
+        el.sourceInput.value = chart.source || "";
+        el.titleInput.value = chart.title || "";
+        el.infoInput.checked = Boolean(chart.info);
+        el.ignoreSeriesInput.value = (chart.ignore_series || []).join(",");
+        el.extraSeriesInput.value = JSON.stringify(chart.extra_series || [], null, 2);
+        renderSecondaryAxis(chart);
+      }
+    }
+
+    function selectionLabel(selection) {
+      if (!selection) return "";
+      if (selection.type === "annotation") return selection.key;
+      const chart = currentCharts()[selection.index];
+      return chart?.title || chart?.source || `图表 ${selection.index + 1}`;
+    }
+
+    function selectedTypeLabel() {
+      if (!state.selected) return "未选择";
+      return state.selected.type === "annotation" ? "标注" : "图表";
+    }
+
+    /* ---------- Secondary axis (combined dropdown) ----------
+     * UI exposes a single "kind" select with values:
+     *   none, temp_col, temp_header, glucose, spectral
+     * which map to the underlying { enabled, source, match, series } shape.
+     */
+
+    function secondaryAxisForDisplay(chart) {
+      if (chart?.secondary_axis && typeof chart.secondary_axis === "object") {
+        return chart.secondary_axis;
+      }
+      if (Array.isArray(chart?.temp)) {
+        return { enabled: true, source: "spectral", series: chart.temp };
+      }
+      if (chart?.temp !== undefined && String(chart.temp).trim() !== "" && String(chart.temp).trim() !== "0") {
+        return {
+          enabled: true,
+          source: "temperature",
+          match: { type: "column", value: chart.temp }
+        };
+      }
+      return { enabled: false, source: "none" };
+    }
+
+    function axisKind(axis) {
+      if (!axis || !axis.enabled || axis.source === "none") return "none";
+      if (axis.source === "glucose") return "glucose";
+      if (axis.source === "spectral") return "spectral";
+      if (axis.source === "temperature") {
+        const matchType = axis.match?.type === "header" ? "header" : "column";
+        return matchType === "header" ? "temp_header" : "temp_col";
+      }
+      return "none";
+    }
+
+    function renderSecondaryAxis(chart) {
+      const axis = secondaryAxisForDisplay(chart);
+      const kind = axisKind(axis);
+      el.secondaryKindInput.value = kind;
+
+      const match = axis.match || {};
+      const columnValue = kind === "temp_col" ? String(match.value ?? "") : "";
+      const headerValue = kind === "temp_header" ? String(match.value ?? "") : "";
+      ensureSelectOption(el.secondaryColumnInput, columnValue, temperatureAxisLabel(columnValue));
+      ensureSelectOption(el.secondaryHeaderInput, headerValue);
+      el.secondaryColumnInput.value = columnValue;
+      el.secondaryHeaderInput.value = headerValue;
+      el.secondaryFallbackInput.value = kind === "temp_header" ? (match.fallback_column ?? "") : "";
+      setMultiSelectValues(el.secondarySeriesInput, kind === "spectral" && Array.isArray(axis.series) ? axis.series : []);
+
+      updateSecondaryFieldVisibility();
+    }
+
+    function secondaryAxisLabel(chart) {
+      const axis = secondaryAxisForDisplay(chart);
+      if (!axis.enabled || axis.source === "none") return "";
+
+      if (axis.source === "glucose") return "Y2: 血糖";
+
+      if (axis.source === "temperature") {
+        const match = axis.match || {};
+        if (match.type === "header" && String(match.value || "").trim()) return `Y2: ${match.value}`;
+        if (match.type === "column" && String(match.value ?? "").trim()) return `Y2: ${temperatureAxisLabel(match.value)}`;
+        return "Y2: 温度";
+      }
+
+      if (axis.source === "spectral") {
+        const series = Array.isArray(axis.series) ? axis.series.filter(Boolean) : [];
+        return series.length ? `Y2: ${series.join(", ")}` : "Y2: 光谱";
+      }
+      return "";
+    }
+
+    function updateSecondaryFieldVisibility() {
+      const kind = el.secondaryKindInput.value;
+      el.secondaryColumnField.style.display = kind === "temp_col" ? "block" : "none";
+      el.secondaryHeaderField.style.display = kind === "temp_header" ? "grid" : "none";
+      el.secondarySpectralFields.style.display = kind === "spectral" ? "block" : "none";
+    }
+
+    function updateSecondaryAxis() {
+      const chart = selectedChart();
+      if (!chart) return;
+      pushHistory();
+      const kind = el.secondaryKindInput.value;
+      if (kind === "none") {
+        chart.secondary_axis = { enabled: false, source: "none" };
+      } else if (kind === "temp_col") {
+        chart.secondary_axis = {
+          enabled: true,
+          source: "temperature",
+          match: { type: "column", value: parseNumberLike(el.secondaryColumnInput.value) }
+        };
+      } else if (kind === "temp_header") {
+        const match = { type: "header", value: el.secondaryHeaderInput.value };
+        const fallback = parseOptionalNumber(el.secondaryFallbackInput.value);
+        if (fallback !== undefined) match.fallback_column = fallback;
+        chart.secondary_axis = { enabled: true, source: "temperature", match };
+      } else if (kind === "glucose") {
+        chart.secondary_axis = { enabled: true, source: "glucose" };
+      } else if (kind === "spectral") {
+        chart.secondary_axis = {
+          enabled: true,
+          source: "spectral",
+          series: selectedMultiValues(el.secondarySeriesInput)
+        };
+      }
+      // legacy `temp` field is superseded by secondary_axis; drop it on edit
+      if ("temp" in chart) delete chart.temp;
+      render();
+    }
+
+    function renderValidationPanel() {
+      const messages = validateConfig(state.config);
+      if (!messages.length) {
+        el.validationPanel.innerHTML = '<div class="validation-ok">未发现基础校验问题</div>';
+        return;
+      }
+      el.validationPanel.innerHTML = `<ul>${messages
+        .map((item) => `<li class="${item.type === "warning" ? "validation-warning" : "validation-error"}">${escapeHtml(item.text)}</li>`)
+        .join("")}</ul>`;
+    }
+
+    function syncJson() {
+      el.jsonOutput.value = JSON.stringify(state.config, null, 2);
+    }
+
+    function updateSelectedBounds() {
+      const bounds = boundsOf();
+      if (!bounds) return;
+      pushHistory();
+      bounds.left = Number(el.leftInput.value || 0);
+      bounds.top = Number(el.topInput.value || 0);
+      bounds.width = Math.max(1, Number(el.widthInput.value || 1));
+      bounds.height = Math.max(1, Number(el.heightInput.value || 1));
+      render();
+    }
+
+    function validateConfig(config) {
+      const messages = [];
+      Object.entries(config.annotations || {}).forEach(([key, bounds]) => {
+        validateBounds(bounds, `annotations.${key}`, messages);
+      });
+      ["charts", "classic_charts"].forEach((collection) => {
+        (Array.isArray(config[collection]) ? config[collection] : []).forEach((chart, index) => {
+          const label = `${collection}[${index}]`;
+          if (!String(chart.source || "").trim()) messages.push({ type: "error", text: `${label}: 数据源不能为空` });
+          if (!String(chart.title || "").trim()) messages.push({ type: "error", text: `${label}: 标题不能为空` });
+          if (chart.duplicate) messages.push({ type: "warning", text: `${label}: 包含旧 duplicate 字段，可迁移为普通图表` });
+          validateBounds(chart.bounds, `${label}.bounds`, messages);
+          validateSecondaryAxis(chart.secondary_axis, `${label}.secondary_axis`, messages);
+        });
+      });
+      return messages;
+    }
+
+    function validateBounds(bounds, label, messages) {
+      if (!bounds || typeof bounds !== "object") {
+        messages.push({ type: "error", text: `${label}: bounds 缺失` });
+        return;
+      }
+      ["left", "top", "width", "height"].forEach((name) => {
+        if (!Number.isFinite(Number(bounds[name]))) {
+          messages.push({ type: "error", text: `${label}.${name}: 必须是数字` });
+        }
+      });
+      if (Number(bounds.width) <= 0) messages.push({ type: "error", text: `${label}.width: 必须大于 0` });
+      if (Number(bounds.height) <= 0) messages.push({ type: "error", text: `${label}.height: 必须大于 0` });
+    }
+
+    function validateSecondaryAxis(axis, label, messages) {
+      if (!axis || typeof axis !== "object" || axis.enabled === false) return;
+      const source = axis.source || "none";
+      if (!["temperature", "glucose", "spectral"].includes(source)) {
+        messages.push({ type: "error", text: `${label}.source: 必须是 temperature、glucose 或 spectral` });
+        return;
+      }
+      if (source === "temperature") {
+        const match = axis.match || {};
+        if (match.type === "column") {
+          if (!Number.isFinite(Number(match.value)) || Number(match.value) <= 0) {
+            messages.push({ type: "error", text: `${label}.match.value: 按列号匹配时必须是正数` });
+          }
+        } else if (match.type === "header") {
+          if (!String(match.value || "").trim()) {
+            messages.push({ type: "error", text: `${label}.match.value: 按表头匹配时不能为空` });
+          }
+          if (match.fallback_column !== undefined &&
+              (!Number.isFinite(Number(match.fallback_column)) || Number(match.fallback_column) <= 0)) {
+            messages.push({ type: "error", text: `${label}.match.fallback_column: 必须是正数` });
+          }
+        } else {
+          messages.push({ type: "error", text: `${label}.match.type: 必须是 column 或 header` });
+        }
+      }
+      if (source === "spectral" && (!Array.isArray(axis.series) || axis.series.length === 0)) {
+        messages.push({ type: "error", text: `${label}.series: 光谱序列至少需要一项` });
+      }
+    }
+
+    /* ---------- Board interaction ---------- */
+
+    function boardPointFromEvent(event) {
+      const rect = el.layoutBoard.getBoundingClientRect();
+      return {
+        left: Math.max(0, (event.clientX - rect.left) / state.scale),
+        top: Math.max(0, (event.clientY - rect.top) / state.scale)
+      };
+    }
+
+    function marqueeBounds(marquee = state.marquee) {
+      const left = Math.min(marquee.start.left, marquee.end.left);
+      const top = Math.min(marquee.start.top, marquee.end.top);
+      const right = Math.max(marquee.start.left, marquee.end.left);
+      const bottom = Math.max(marquee.start.top, marquee.end.top);
+      return { left, top, right, bottom, width: right - left, height: bottom - top };
+    }
+
+    function renderMarquee() {
+      const bounds = marqueeBounds();
+      const rect = document.createElement("div");
+      rect.className = "selection-marquee";
+      rect.style.left = `${bounds.left * state.scale}px`;
+      rect.style.top = `${bounds.top * state.scale}px`;
+      rect.style.width = `${bounds.width * state.scale}px`;
+      rect.style.height = `${bounds.height * state.scale}px`;
+      el.layoutBoard.appendChild(rect);
+    }
+
+    function intersectsBounds(bounds, box) {
+      return bounds.left < box.right &&
+        bounds.left + bounds.width > box.left &&
+        bounds.top < box.bottom &&
+        bounds.top + bounds.height > box.top;
+    }
+
+    function startMarqueeSelection(pending) {
+      if (state.pendingMarquee !== pending) return;
+      state.pendingMarquee = null;
+      state.marquee = {
+        pointerId: pending.pointerId,
+        start: pending.start,
+        end: pending.start,
+        additive: pending.additive,
+        baseSelection: pending.baseSelection
+      };
+      renderBoard();
+    }
+
+    function updateMarqueeSelection(event) {
+      if (!state.marquee || event.pointerId !== state.marquee.pointerId) return;
+      event.preventDefault();
+      state.marquee.end = boardPointFromEvent(event);
+      const box = marqueeBounds();
+      const selected = allVisibleSelections().filter((selection) => {
+        const bounds = boundsOf(selection);
+        return bounds && intersectsBounds(bounds, box);
+      });
+      const baseSelection = state.marquee.additive ? state.marquee.baseSelection : [];
+      setSelection([...baseSelection, ...selected], selected[selected.length - 1] || baseSelection[baseSelection.length - 1] || null);
+    }
+
+    function onBoardPointerDown(event) {
+      if (event.button !== 0 || event.target !== el.layoutBoard) return;
+      event.preventDefault();
+      el.boardShell.focus();
+      const pending = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        start: boardPointFromEvent(event),
+        additive: event.shiftKey || event.ctrlKey || event.metaKey,
+        baseSelection: state.selection.map((item) => ({ ...item }))
+      };
+      state.pendingMarquee = pending;
+      window.addEventListener("pointermove", onBoardPointerMove);
+      window.addEventListener("pointerup", onBoardPointerUp);
+      window.addEventListener("pointercancel", onBoardPointerUp);
+    }
+
+    function onBoardPointerMove(event) {
+      if (state.marquee) {
+        updateMarqueeSelection(event);
+        return;
+      }
+      if (!state.pendingMarquee || event.pointerId !== state.pendingMarquee.pointerId) return;
+      const dx = event.clientX - state.pendingMarquee.startX;
+      const dy = event.clientY - state.pendingMarquee.startY;
+      if (Math.hypot(dx, dy) > MARQUEE_START_PX) {
+        startMarqueeSelection(state.pendingMarquee);
+        updateMarqueeSelection(event);
+      }
+    }
+
+    function onBoardPointerUp(event) {
+      if (state.pendingMarquee && event.pointerId !== state.pendingMarquee.pointerId) return;
+      if (state.marquee && event.pointerId !== state.marquee.pointerId) return;
+      const hadPending = Boolean(state.pendingMarquee);
+      const hadMarquee = Boolean(state.marquee);
+      const additive = Boolean(state.pendingMarquee?.additive || state.marquee?.additive);
+      cancelMarqueeSelection(hadMarquee);
+      if (hadPending && !hadMarquee && !additive) clearSelection();
+    }
+
+    function cancelMarqueeSelection(shouldRender) {
+      state.pendingMarquee = null;
+      state.marquee = null;
+      window.removeEventListener("pointermove", onBoardPointerMove);
+      window.removeEventListener("pointerup", onBoardPointerUp);
+      window.removeEventListener("pointercancel", onBoardPointerUp);
+      if (shouldRender) render();
+    }
+
+    function onRectPointerDown(event) {
+      event.preventDefault();
+      el.boardShell.focus();
+      const rect = event.currentTarget;
+      const selection = JSON.parse(rect.dataset.selection);
+      const additive = event.shiftKey || event.ctrlKey || event.metaKey;
+      if (additive) {
+        select(selection, true);
+        if (!isSelected(selection) || !boundsOf(selection)) return;
+      } else if (!isSelected(selection)) {
+        setSelection([selection], selection);
+      } else {
+        state.selected = selection;
+      }
+
+      const bounds = boundsOf(selection);
+      if (!bounds) return;
+      const mode = event.target.classList.contains("resize-handle") ? "resize" : "move";
+      const items = mode === "resize" ? [{ selection, bounds }] : selectedItems();
+
+      pushHistory();
+      state.drag = {
+        mode,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        moved: false,
+        items: items.map((item) => ({
+          selection: item.selection,
+          startBounds: clone(item.bounds)
+        }))
+      };
+      window.addEventListener("pointermove", onRectPointerMove);
+      window.addEventListener("pointerup", onRectPointerUp);
+      window.addEventListener("pointercancel", onRectPointerUp);
+      renderLists();
+      renderInspector();
+      syncJson();
+    }
+
+    function onRectPointerMove(event) {
+      if (!state.drag) return;
+      if (event.pointerId !== state.drag.pointerId) return;
+      event.preventDefault();
+      const dx = (event.clientX - state.drag.startX) / state.scale;
+      const dy = (event.clientY - state.drag.startY) / state.scale;
+      if (dx !== 0 || dy !== 0) state.drag.moved = true;
+
+      state.drag.items.forEach((item) => {
+        const bounds = boundsOf(item.selection);
+        if (!bounds) return;
+        if (state.drag.mode === "resize") {
+          bounds.width = snap(Math.max(20, item.startBounds.width + dx));
+          bounds.height = snap(Math.max(20, item.startBounds.height + dy));
+        } else {
+          bounds.left = snap(Math.max(0, item.startBounds.left + dx));
+          bounds.top = snap(Math.max(0, item.startBounds.top + dy));
+        }
+      });
+
+      renderBoard();
+      renderInspector();
+      syncJson();
+    }
+
+    function onRectPointerUp(event) {
+      if (state.drag && event.pointerId !== state.drag.pointerId) return;
+      window.removeEventListener("pointermove", onRectPointerMove);
+      window.removeEventListener("pointerup", onRectPointerUp);
+      window.removeEventListener("pointercancel", onRectPointerUp);
+      const moved = state.drag?.moved;
+      state.drag = null;
+      if (!moved && state.history.past.length) {
+        // discard the no-op snapshot pushed at pointerdown
+        state.history.past.pop();
+        updateUndoRedoButtons();
+      }
+      render();
+    }
+
+    function handleBoardKeyDown(event) {
+      if (isTypingTarget(event.target)) return;
+      const ctrl = event.ctrlKey || event.metaKey;
+
+      if (ctrl && !event.shiftKey && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        undo();
+        return;
+      }
+      if (ctrl && (event.key.toLowerCase() === "y" || (event.shiftKey && event.key.toLowerCase() === "z"))) {
+        event.preventDefault();
+        redo();
+        return;
+      }
+      if (ctrl && event.key.toLowerCase() === "a") {
+        event.preventDefault();
+        selectAllVisible();
+        return;
+      }
+      if (ctrl && event.key.toLowerCase() === "c") {
+        if (selectedItems().length) {
+          event.preventDefault();
+          duplicateSelectedObjects();
+        }
+        return;
+      }
+      if (event.key === "Escape") {
+        clearSelection();
+        return;
+      }
+      if (event.key === "Delete" || event.key === "Backspace") {
+        event.preventDefault();
+        deleteSelected();
+        return;
+      }
+
+      const directions = {
+        ArrowLeft: [-1, 0], ArrowRight: [1, 0],
+        ArrowUp: [0, -1], ArrowDown: [0, 1]
+      };
+      const direction = directions[event.key];
+      if (!direction) return;
+
+      const items = selectedItems();
+      if (!items.length) return;
+      const baseStep = Math.max(1, Number(el.nudgeStepInput.value || 1));
+      const step = event.shiftKey ? baseStep * 10 : baseStep;
+      pushHistory();
+      items.forEach((item) => {
+        item.bounds.left = Math.max(0, round(item.bounds.left + direction[0] * step));
+        item.bounds.top = Math.max(0, round(item.bounds.top + direction[1] * step));
+      });
+      event.preventDefault();
+      render();
+    }
+
+    function isTypingTarget(target) {
+      return target instanceof HTMLInputElement ||
+        target instanceof HTMLSelectElement ||
+        target instanceof HTMLTextAreaElement ||
+        target?.isContentEditable;
+    }
+
+    /* ---------- Layout actions ---------- */
+
+    function alignSelection(mode) {
+      const items = selectedItems();
+      if (items.length < 2) return;
+      pushHistory();
+      const box = selectionBoundsBox(items);
+      items.forEach((item) => {
+        if (mode === "left") item.bounds.left = box.left;
+        if (mode === "center") item.bounds.left = box.left + (box.width - item.bounds.width) / 2;
+        if (mode === "right") item.bounds.left = box.right - item.bounds.width;
+        if (mode === "top") item.bounds.top = box.top;
+        if (mode === "middle") item.bounds.top = box.top + (box.height - item.bounds.height) / 2;
+        if (mode === "bottom") item.bounds.top = box.bottom - item.bounds.height;
+        item.bounds.left = snap(Math.max(0, item.bounds.left));
+        item.bounds.top = snap(Math.max(0, item.bounds.top));
+      });
+      render();
+    }
+
+    function resizeSelection(mode) {
+      const items = selectedItems();
+      if (items.length < 2) return;
+      pushHistory();
+      const reference = boundsOf(state.selected) || items[0].bounds;
+      items.forEach((item) => {
+        if (mode === "width") item.bounds.width = reference.width;
+        if (mode === "height") item.bounds.height = reference.height;
+      });
+      render();
+    }
+
+    function distributeSelection(axis) {
+      const items = selectedItems();
+      if (items.length < 3) return;
+      pushHistory();
+      const sorted = [...items].sort((a, b) => axis === "horizontal"
+        ? a.bounds.left - b.bounds.left
+        : a.bounds.top - b.bounds.top);
+      const first = sorted[0].bounds;
+      const last = sorted[sorted.length - 1].bounds;
+      const start = axis === "horizontal" ? first.left : first.top;
+      const end = axis === "horizontal" ? last.left + last.width : last.top + last.height;
+      const totalSize = sorted.reduce((sum, item) => sum + (axis === "horizontal" ? item.bounds.width : item.bounds.height), 0);
+      const gap = (end - start - totalSize) / (sorted.length - 1);
+      let cursor = start;
+      sorted.forEach((item) => {
+        if (axis === "horizontal") {
+          item.bounds.left = snap(Math.max(0, cursor));
+          cursor += item.bounds.width + gap;
+        } else {
+          item.bounds.top = snap(Math.max(0, cursor));
+          cursor += item.bounds.height + gap;
+        }
+      });
+      render();
+    }
+
+    function selectionBoundsBox(items = selectedItems()) {
+      const left = Math.min(...items.map((item) => item.bounds.left));
+      const top = Math.min(...items.map((item) => item.bounds.top));
+      const right = Math.max(...items.map((item) => item.bounds.left + item.bounds.width));
+      const bottom = Math.max(...items.map((item) => item.bounds.top + item.bounds.height));
+      return { left, top, right, bottom, width: right - left, height: bottom - top };
+    }
+
+    function duplicateSelectedObjects() {
+      const items = selectedItems();
+      if (!items.length) return;
+      pushHistory();
+      const offset = Math.max(20, Number(el.snapSizeInput.value || 10) * 2);
+      const nextSelection = [];
+      const charts = currentCharts();
+
+      items.forEach((item) => {
+        if (item.selection.type === "chart" && item.chart) {
+          const copy = clone(item.chart);
+          delete copy.duplicate;
+          copy.bounds = {
+            ...normalizeBounds(copy.bounds),
+            left: normalizeBounds(copy.bounds).left + offset,
+            top: normalizeBounds(copy.bounds).top + offset
+          };
+          copy.key = uniqueChartKey(copy.key || copy.source || "chart", charts);
+          if (copy.title) copy.title = `${copy.title} 副本`;
+          charts.push(copy);
+          nextSelection.push({ type: "chart", index: charts.length - 1 });
+        }
+        if (item.selection.type === "annotation") {
+          const key = uniqueKey(item.selection.key || "annotation");
+          state.config.annotations[key] = {
+            ...normalizeBounds(item.bounds),
+            left: item.bounds.left + offset,
+            top: item.bounds.top + offset
+          };
+          nextSelection.push({ type: "annotation", key });
+        }
+      });
+
+      setSelection(nextSelection, nextSelection[nextSelection.length - 1]);
+    }
+
+    function selectAllVisible() {
+      const all = allVisibleSelections();
+      setSelection(all, all[all.length - 1]);
+    }
+
+    function clearSelection() {
+      setSelection([], null);
+    }
+
+    function fitView() {
+      const items = allVisibleSelections()
+        .map((selection) => ({ selection, bounds: boundsOf(selection) }))
+        .filter((item) => item.bounds);
+      if (!items.length) return;
+      const box = selectionBoundsBox(items);
+      const widthScale = (el.boardShell.clientWidth - 80) / Math.max(1, box.right + 180);
+      const heightScale = (el.boardShell.clientHeight - 80) / Math.max(1, box.bottom + 180);
+      state.scale = Math.max(0.12, Math.min(0.8, widthScale, heightScale));
+      el.zoomInput.value = String(state.scale);
+      renderBoard();
+    }
+
+    function applyLegacyDuplicateMigration() {
+      pushHistory();
+      state.config[state.collection] = flattenLegacyDuplicates(currentCharts()).map((chart) => {
+        chart.bounds = normalizeBounds(chart.bounds);
+        return chart;
+      });
+      setSelection([], null);
+      setStatus("旧副图配置已迁移");
+    }
+
+    function snap(value) {
+      if (!el.snapInput.checked) return round(value);
+      const size = Math.max(1, Number(el.snapSizeInput.value || 1));
+      return Math.round(value / size) * size;
+    }
+
+    function round(value) {
+      return Math.round(Number(value) * 100) / 100;
+    }
+
+    function parseNumberLike(value) {
+      const text = String(value || "").trim();
+      if (!text) return "";
+      const number = Number(text);
+      return Number.isFinite(number) ? number : text;
+    }
+
+    function parseOptionalNumber(value) {
+      const text = String(value || "").trim();
+      if (!text) return undefined;
+      return parseNumberLike(text);
+    }
+
+    function splitList(value) {
+      return String(value || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+
+    function addChart() {
+      pushHistory();
+      const charts = currentCharts();
+      const index = charts.length;
+      const source = CHART_SOURCE_OPTIONS[0].value;
+      charts.push({
+        source,
+        key: uniqueChartKey(source, charts),
+        title: source,
+        info: false,
+        secondary_axis: { enabled: false, source: "none" },
+        bounds: {
+          left: 400 + (index % 4) * 720,
+          top: 400 + Math.floor(index / 4) * 420,
+          width: 700,
+          height: 400
+        }
+      });
+      select({ type: "chart", index });
+    }
+
+    function addAnnotation() {
+      pushHistory();
+      const key = uniqueKey("annotation");
+      state.config.annotations[key] = { left: 400, top: 300, width: 700, height: 120 };
+      select({ type: "annotation", key });
+    }
+
+    function deleteSelected() {
+      const items = selectedItems();
+      if (!items.length) return;
+      pushHistory();
+      const chartIndexes = items
+        .filter((item) => item.selection.type === "chart")
+        .map((item) => item.selection.index)
+        .sort((a, b) => b - a);
+      const annotationKeys = items
+        .filter((item) => item.selection.type === "annotation")
+        .map((item) => item.selection.key);
+
+      chartIndexes.forEach((index) => currentCharts().splice(index, 1));
+      annotationKeys.forEach((key) => delete state.config.annotations[key]);
+      setSelection([], null);
+    }
+
+    function uniqueKey(prefix) {
+      let index = 1;
+      let key = `${prefix}_${index}`;
+      while (state.config.annotations[key]) {
+        index += 1;
+        key = `${prefix}_${index}`;
+      }
+      return key;
+    }
+
+    function uniqueChartKey(base, charts = currentCharts()) {
+      const cleanBase = String(base || "chart").replace(/\s+/g, "_");
+      const used = new Set(charts.map((chart) => String(chart.key || "")));
+      let index = 1;
+      let key = `${cleanBase}_copy`;
+      while (used.has(key)) {
+        index += 1;
+        key = `${cleanBase}_copy_${index}`;
+      }
+      return key;
+    }
+
+    function updateChartSeriesFields() {
+      const chart = selectedChart();
+      if (!chart) return;
+      pushHistory();
+      chart.ignore_series = el.ignoreSeriesInput.value
+        .split(",")
+        .map((item) => Number(item.trim()))
+        .filter((item) => Number.isFinite(item));
+      try {
+        chart.extra_series = JSON.parse(el.extraSeriesInput.value || "[]");
+        render();
+      } catch (error) {
+        setStatus(error.message, "error");
+      }
+    }
+
+    function applyJsonText() {
+      try {
+        pushHistory();
+        state.config = normalizeConfig(JSON.parse(el.jsonOutput.value));
+        const firstAnnotation = Object.keys(state.config.annotations)[0];
+        setSelection(firstAnnotation ? [{ type: "annotation", key: firstAnnotation }] : [], firstAnnotation ? { type: "annotation", key: firstAnnotation } : null);
+        setStatus("JSON 已加载");
+        return true;
+      } catch (error) {
+        // failed parse: drop the history snapshot we just pushed
+        state.history.past.pop();
+        updateUndoRedoButtons();
+        setStatus(error.message, "error");
+        return false;
+      }
+    }
+
+    function copyJson() {
+      navigator.clipboard.writeText(el.jsonOutput.value)
+        .then(() => setStatus("JSON 已复制"))
+        .catch((error) => setStatus(error.message, "error"));
+    }
+
+    async function openJsonFile() {
+      try {
+        if (window.showOpenFilePicker) {
+          const [fileHandle] = await window.showOpenFilePicker({
+            multiple: false,
+            types: JSON_FILE_TYPES
+          });
+          const file = await fileHandle.getFile();
+          await loadJsonFile(file, fileHandle);
+        } else {
+          el.jsonFile.click();
+        }
+      } catch (error) {
+        if (error.name !== "AbortError") setStatus(error.message, "error");
+      }
+    }
+
+    async function loadJsonFile(file, fileHandle = null) {
+      el.jsonOutput.value = await file.text();
+      if (!applyJsonText()) return;
+      state.fileHandle = fileHandle;
+      state.fileName = file.name || "chart_config.json";
+      setStatus(`已打开 ${state.fileName}`);
+    }
+
+    async function handleJsonInputChange() {
+      const file = el.jsonFile.files?.[0];
+      if (!file) return;
+      await loadJsonFile(file, null);
+      el.jsonFile.value = "";
+    }
+
+    async function ensureWritePermission(fileHandle) {
+      if (!fileHandle.queryPermission || !fileHandle.requestPermission) return true;
+      const options = { mode: "readwrite" };
+      if (await fileHandle.queryPermission(options) === "granted") return true;
+      return await fileHandle.requestPermission(options) === "granted";
+    }
+
+    async function writeJsonFile(fileHandle, content) {
+      if (!await ensureWritePermission(fileHandle)) {
+        throw new Error("未获得文件写入权限");
+      }
+      const writable = await fileHandle.createWritable();
+      await writable.write(content);
+      await writable.close();
+    }
+
+    async function saveJson() {
+      if (!state.fileHandle) {
+        await saveJsonAs();
+        return;
+      }
+      try {
+        await writeJsonFile(state.fileHandle, el.jsonOutput.value);
+        setStatus(`已保存 ${state.fileName}`);
+      } catch (error) {
+        if (error.name !== "AbortError") setStatus(error.message, "error");
+      }
+    }
+
+    async function saveJsonAs() {
+      try {
+        if (window.showSaveFilePicker) {
+          const fileHandle = await window.showSaveFilePicker({
+            suggestedName: state.fileName || "chart_config.json",
+            types: JSON_FILE_TYPES
+          });
+          await writeJsonFile(fileHandle, el.jsonOutput.value);
+          state.fileHandle = fileHandle;
+          state.fileName = fileHandle.name || "chart_config.json";
+          setStatus(`已保存 ${state.fileName}`);
+        } else {
+          downloadJson(state.fileName);
+          setStatus("浏览器不支持直接另存为，已下载 JSON");
+        }
+      } catch (error) {
+        if (error.name !== "AbortError") setStatus(error.message, "error");
+      }
+    }
+
+    function downloadJson(fileName = "chart_config.json") {
+      const blob = new Blob([el.jsonOutput.value], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName || "chart_config.json";
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function toggleDrawer(force) {
+      const collapsed = el.drawer.classList.contains("collapsed");
+      const next = force === undefined ? !collapsed : !force;
+      el.drawer.classList.toggle("collapsed", next);
+    }
+
+    function bindEvents() {
+      el.chartCollection.addEventListener("change", () => {
+        state.collection = el.chartCollection.value;
+        setSelection([], null);
+      });
+
+      el.zoomInput.addEventListener("input", () => {
+        state.scale = Number(el.zoomInput.value);
+        renderBoard();
+      });
+
+      el.layoutBoard.addEventListener("pointerdown", onBoardPointerDown);
+      document.addEventListener("keydown", handleBoardKeyDown);
+
+      [el.leftInput, el.topInput, el.widthInput, el.heightInput].forEach((input) => {
+        input.addEventListener("change", updateSelectedBounds);
+      });
+
+      el.sourceInput.addEventListener("change", () => {
+        const chart = selectedChart();
+        if (!chart) return;
+        pushHistory();
+        chart.source = el.sourceInput.value.trim();
+        if (!chart.key) chart.key = chart.source;
+        render();
+      });
+
+      el.titleInput.addEventListener("change", () => {
+        const chart = selectedChart();
+        if (!chart) return;
+        pushHistory();
+        chart.title = el.titleInput.value;
+        render();
+      });
+
+      el.infoInput.addEventListener("change", () => {
+        const chart = selectedChart();
+        if (!chart) return;
+        pushHistory();
+        chart.info = el.infoInput.checked;
+        render();
+      });
+
+      el.ignoreSeriesInput.addEventListener("change", updateChartSeriesFields);
+      el.extraSeriesInput.addEventListener("change", updateChartSeriesFields);
+
+      el.secondaryKindInput.addEventListener("change", () => {
+        updateSecondaryFieldVisibility();
+        updateSecondaryAxis();
+      });
+      [
+        el.secondaryColumnInput,
+        el.secondaryHeaderInput,
+        el.secondaryFallbackInput,
+        el.secondarySeriesInput
+      ].forEach((input) => input.addEventListener("change", updateSecondaryAxis));
+
+      el.openJson.addEventListener("click", openJsonFile);
+      el.jsonFile.addEventListener("change", handleJsonInputChange);
+
+      el.applyJson.addEventListener("click", applyJsonText);
+      el.addChart.addEventListener("click", addChart);
+      el.duplicateSelection.addEventListener("click", duplicateSelectedObjects);
+      el.addAnnotation.addEventListener("click", addAnnotation);
+      el.deleteSelected.addEventListener("click", deleteSelected);
+      el.flattenDuplicates.addEventListener("click", applyLegacyDuplicateMigration);
+      el.copyJson.addEventListener("click", copyJson);
+      el.saveJson.addEventListener("click", saveJson);
+      el.saveJsonAs.addEventListener("click", saveJsonAs);
+
+      el.undoBtn.addEventListener("click", undo);
+      el.redoBtn.addEventListener("click", redo);
+      el.toggleDrawer.addEventListener("click", () => toggleDrawer());
+      el.closeDrawer.addEventListener("click", () => toggleDrawer(false));
+
+      el.selectAllVisible.addEventListener("click", selectAllVisible);
+      el.clearSelection.addEventListener("click", clearSelection);
+      el.fitView.addEventListener("click", fitView);
+      el.alignLeft.addEventListener("click", () => alignSelection("left"));
+      el.alignCenter.addEventListener("click", () => alignSelection("center"));
+      el.alignRight.addEventListener("click", () => alignSelection("right"));
+      el.alignTop.addEventListener("click", () => alignSelection("top"));
+      el.alignMiddle.addEventListener("click", () => alignSelection("middle"));
+      el.alignBottom.addEventListener("click", () => alignSelection("bottom"));
+      el.sameWidth.addEventListener("click", () => resizeSelection("width"));
+      el.sameHeight.addEventListener("click", () => resizeSelection("height"));
+      el.distributeHorizontal.addEventListener("click", () => distributeSelection("horizontal"));
+      el.distributeVertical.addEventListener("click", () => distributeSelection("vertical"));
+    }
+
+    populateFixedOptions();
+    bindEvents();
+    updateUndoRedoButtons();
+    render();
+  </script>
+</body>
+</html>
