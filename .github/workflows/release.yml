@@ -50,6 +50,17 @@ jobs:
             --windows-console-mode=disable ^
             --output-filename=${{ env.EXE_NAME }}.exe
         shell: cmd
+
+      - name: Add release resources
+        run: |
+          $distDir = "${{ env.OUTPUT_DIR }}\${{ env.EXE_NAME }}.dist"
+
+          New-Item -ItemType Directory -Force -Path "$distDir\tools" | Out-Null
+          Copy-Item -Path "tools\*.html" -Destination "$distDir\tools" -Force
+
+          New-Item -ItemType Directory -Force -Path "$distDir\src" | Out-Null
+          Copy-Item -Path "src\*.json" -Destination "$distDir\src" -Force
+        shell: pwsh
       
       - name: Archive Nuitka output for release
         run: |

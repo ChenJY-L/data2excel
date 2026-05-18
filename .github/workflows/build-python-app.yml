@@ -99,6 +99,23 @@ jobs:
           name: windows-executable
           path: ${{ env.OUTPUT_DIR }}
 
+      - name: Package Release Files
+        run: |
+          $packageDir = Join-Path "${{ env.OUTPUT_DIR }}" "package"
+          $zipPath = Join-Path "${{ env.OUTPUT_DIR }}" "${{ env.EXE_NAME }}_windows.zip"
+
+          New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
+          Copy-Item -Path "${{ env.OUTPUT_DIR }}\${{ env.EXE_NAME }}.exe" -Destination $packageDir -Force
+
+          New-Item -ItemType Directory -Force -Path (Join-Path $packageDir "tools") | Out-Null
+          Copy-Item -Path "tools\*.html" -Destination (Join-Path $packageDir "tools") -Force
+
+          New-Item -ItemType Directory -Force -Path (Join-Path $packageDir "src") | Out-Null
+          Copy-Item -Path "src\*.json" -Destination (Join-Path $packageDir "src") -Force
+
+          Compress-Archive -Path "$packageDir\*" -DestinationPath $zipPath -Force
+        shell: pwsh
+
       - name: Generate Timestamp
         id: timestamp
         run: echo "TIMESTAMP=$(Get-Date -Format 'yyyyMMdd-HHmm')" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -136,7 +153,7 @@ jobs:
             ---
             *此版本由 GitHub Actions 自动构建和发布。*
           prerelease: false
-          files: ${{ env.OUTPUT_DIR }}/${{ env.EXE_NAME }}.exe
+          files: ${{ env.OUTPUT_DIR }}/${{ env.EXE_NAME }}_windows.zip
 
       # [新增] 最后一步，移动 'latest' 标签以指向刚刚创建的新版本
       - name: Update 'latest' Tag
