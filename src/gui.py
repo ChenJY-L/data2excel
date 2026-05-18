@@ -22,7 +22,7 @@ class Ui_Data_Processing(object):
 
         # ==================== 数据输入组 ====================
         self.dataInputGroup = QtWidgets.QGroupBox(Data_Processing)
-        self.dataInputGroup.setGeometry(QtCore.QRect(10, 10, 630, 80))
+        self.dataInputGroup.setGeometry(QtCore.QRect(10, 10, 630, 110))
         self.dataInputGroup.setFont(font)
         self.dataInputGroup.setObjectName("dataInputGroup")
 
@@ -57,9 +57,25 @@ class Ui_Data_Processing(object):
         self.FileSelect.setFont(font)
         self.FileSelect.setObjectName("FileSelect")
 
+        # 图表配置文件路径
+        self.ChartConfigLabel = QtWidgets.QLabel(self.dataInputGroup)
+        self.ChartConfigLabel.setGeometry(QtCore.QRect(10, 55, 50, 25))
+        self.ChartConfigLabel.setFont(font)
+        self.ChartConfigLabel.setObjectName("ChartConfigLabel")
+
+        self.ChartConfigPath = QtWidgets.QTextEdit(self.dataInputGroup)
+        self.ChartConfigPath.setGeometry(QtCore.QRect(70, 55, 460, 25))
+        self.ChartConfigPath.setFont(path_font)
+        self.ChartConfigPath.setObjectName("ChartConfigPath")
+
+        self.ChartConfigSelect = QtWidgets.QPushButton(self.dataInputGroup)
+        self.ChartConfigSelect.setGeometry(QtCore.QRect(540, 55, 80, 25))
+        self.ChartConfigSelect.setFont(font)
+        self.ChartConfigSelect.setObjectName("ChartConfigSelect")
+
         # ==================== 处理选项组 ====================
         self.optionsGroup = QtWidgets.QGroupBox(Data_Processing)
-        self.optionsGroup.setGeometry(QtCore.QRect(10, 100, 630, 100))
+        self.optionsGroup.setGeometry(QtCore.QRect(10, 130, 630, 100))
         self.optionsGroup.setFont(font)
         self.optionsGroup.setObjectName("optionsGroup")
 
@@ -139,7 +155,7 @@ class Ui_Data_Processing(object):
 
         # ==================== 参数设置组 ====================
         self.parametersGroup = QtWidgets.QGroupBox(Data_Processing)
-        self.parametersGroup.setGeometry(QtCore.QRect(10, 210, 280, 60))
+        self.parametersGroup.setGeometry(QtCore.QRect(10, 240, 280, 60))
         self.parametersGroup.setFont(font)
         self.parametersGroup.setObjectName("parametersGroup")
 
@@ -173,7 +189,7 @@ class Ui_Data_Processing(object):
 
         # ==================== 控制组 ====================
         self.controlGroup = QtWidgets.QGroupBox(Data_Processing)
-        self.controlGroup.setGeometry(QtCore.QRect(300, 210, 340, 60))
+        self.controlGroup.setGeometry(QtCore.QRect(300, 240, 340, 60))
         self.controlGroup.setFont(font)
         self.controlGroup.setObjectName("controlGroup")
 
@@ -205,7 +221,7 @@ class Ui_Data_Processing(object):
 
         # ==================== 信息显示组 ====================
         self.infoGroup = QtWidgets.QGroupBox(Data_Processing)
-        self.infoGroup.setGeometry(QtCore.QRect(10, 280, 630, 80))
+        self.infoGroup.setGeometry(QtCore.QRect(10, 310, 630, 80))
         self.infoGroup.setFont(font)
         self.infoGroup.setObjectName("infoGroup")
 
@@ -244,6 +260,8 @@ class Ui_Data_Processing(object):
         self.Original.setItemText(0, _translate("Data_Processing", "Calibrated"))
         self.Original.setItemText(1, _translate("Data_Processing", "Original"))
         self.FileSelect.setText(_translate("Data_Processing", "Select File"))
+        self.ChartConfigLabel.setText(_translate("Data_Processing", "Config:"))
+        self.ChartConfigSelect.setText(_translate("Data_Processing", "Select Config"))
 
         self.TempCheckBox.setText(_translate("Data_Processing", "Temperature"))
         self.PLTCheckBox.setText(_translate("Data_Processing", "Plot"))

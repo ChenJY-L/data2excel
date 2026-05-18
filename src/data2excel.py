@@ -122,10 +122,12 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         self.tempCorrelationCheckBox.setChecked(True)
         self.classicCheckBox.setChecked(False)
         self.autoSetBaseCheckBox.setChecked(True)
+        self.chart_config_path = None
 
         # 连接信号和槽函数
         self.Process.clicked.connect(self.DataProcess)
         self.FileSelect.clicked.connect(self.FileSelectF)
+        self.ChartConfigSelect.clicked.connect(self.ChartConfigSelectF)
 
         # 初始化Excel应用程序
         self.xwapp = xw.App(visible=False, add_book=False)
@@ -175,6 +177,20 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         filenames = (QFileDialog.getOpenFileNames(self, 'Select', SchPath, "Data Files(*.dat);;All Files(*)"))
         if filenames[0] != []:
             self.Path.setPlainText(filenames[0][0])
+
+    def ChartConfigSelectF(self):
+        """
+        选择图表配置JSON文件
+        """
+        self.GuiRefresh(self.Status, 'Selecting Config')
+        SchPath = os.getcwd()
+        if self.ChartConfigPath.toPlainText() != '':
+            SchPath = os.path.dirname(self.ChartConfigPath.toPlainText())
+        filename, _ = QFileDialog.getOpenFileName(self, 'Select Config', SchPath, "JSON Files(*.json);;All Files(*)")
+        if filename:
+            self.chart_config_path = filename
+            self.ChartConfigPath.setPlainText(filename)
+            self.GuiRefresh(self.Status, 'Config Selected')
 
     def FilePath(self, path, filename):
         """
@@ -1683,7 +1699,9 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         # 重置图表列表
         self.charts = []
 
-        chart_config = load_chart_config()
+        if self.ChartConfigPath.toPlainText().strip() != '':
+            self.chart_config_path = self.ChartConfigPath.toPlainText().strip()
+        chart_config = load_chart_config(self.chart_config_path)
         chart_plan = build_chart_plan(
             chart_config,
             classic=self.classicCheckBox.isChecked(),
