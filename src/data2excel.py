@@ -2889,8 +2889,10 @@ if __name__ == "__main__":
     app.exec()
 
     # 清理Excel应用程序
-    form.xwapp.quit()
     try:
-        form.xwapp.kill()
-    except Exception as e:
-        pass
+        form.xwapp.quit()
+    except Exception:
+        try:
+            form.xwapp.kill()
+        except Exception:
+            pass
