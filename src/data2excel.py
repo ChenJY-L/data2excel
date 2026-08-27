@@ -755,21 +755,22 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             })
 
         segment_points = []
-        for split in split_points:
-            seg_minutes = time_flat[split - 1] - time_flat[0 if len(segment_points) == 0 else segment_points[-1]["cycle"]]
-            segment_points.append({
-                "cycle": int(split + 1),
-                "time": float(time_flat[split]),
-                "gap_minutes": float(gaps[split - 1]),
-                "seg_minutes": seg_minutes,
-            })
+        if split_points.size > 0:
+            for split in split_points:
+                seg_minutes = time_flat[split - 1] - time_flat[0 if len(segment_points) == 0 else segment_points[-1]["cycle"]]
+                segment_points.append({
+                    "cycle": int(split + 1),
+                    "time": float(time_flat[split]),
+                    "gap_minutes": float(gaps[split - 1]),
+                    "seg_minutes": seg_minutes,
+                })
 
-        segment_points.insert(0, {
-            "cycle": 1,
-            "time": timearr[0].item(),
-            "gap_minutes": 0.0,
-            "seg_minutes": time_flat[split_points[0] - 1] - time_flat[0]
-        })
+            segment_points.insert(0, {
+                "cycle": 1,
+                "time": timearr[0].item(),
+                "gap_minutes": 0.0,
+                "seg_minutes": time_flat[split_points[0] - 1] - time_flat[0]
+            })
         return baseline_cycle, segment_points
 
     def merge_expinfo_with_auto_baseline(self, expInfo, baseline_cycle, note_path=None):
@@ -2031,7 +2032,11 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 timearr[l] = timeele
                 cycleNoarr[l] = l + 1
 
-            if self.autoSetBaseCheckBox.isChecked():
+            # 基于时间分段自动生成基准配置（不写备注文件，直接内存传递）
+            baseline_cycle, segment_points = self.build_auto_baseline_info(timearr, gap_minutes=float(self.AutoBaseThresh.value()) / 60)
+
+            # 无分段时第二次处理与第一次等价，直接走单次原始流程
+            if self.autoSetBaseCheckBox.isChecked() and segment_points:
                 # Auto Base模式：复用同一个workbook，避免重复打开/关闭
                 wb, sheetnames = self.create_excel_workbook(Chpath, C, reset_file=True)
 
@@ -2043,8 +2048,6 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                     wb=wb, sheetnames=sheetnames, close_wb=False
                 )
 
-                # 基于时间分段自动生成基准配置（不写备注文件，直接内存传递）
-                baseline_cycle, segment_points = self.build_auto_baseline_info(timearr, gap_minutes=float(self.AutoBaseThresh.value()) / 60)
                 expInfo_auto = self.merge_expinfo_with_auto_baseline(expInfo, baseline_cycle)
 
                 # 第二次：仅输出自动基准吸光度两张sheet并绘图
