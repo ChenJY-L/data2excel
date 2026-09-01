@@ -1,14 +1,33 @@
 import copy
 import json
+import sys
 from pathlib import Path
 
 
-DEFAULT_CONFIG_PATH = Path(__file__).with_name("chart_config.json")
 BOUNDS_KEYS = ("left", "top", "width", "height")
 
 
+def default_config_path():
+    """
+    默认配置路径。
+
+    打包成 onefile 后 __file__ 指向临时解包目录，配置文件可能随发布包放在
+    exe 同级，因此按 源码同级 → exe同级src → exe同级 的顺序查找。
+    """
+    exe_dir = Path(sys.executable).parent
+    candidates = (
+        Path(__file__).with_name("chart_config.json"),
+        exe_dir / "src" / "chart_config.json",
+        exe_dir / "chart_config.json",
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return candidates[0]
+
+
 def load_chart_config(config_path=None):
-    path = Path(config_path) if config_path else DEFAULT_CONFIG_PATH
+    path = Path(config_path) if config_path else default_config_path()
     with path.open("r", encoding="utf-8") as fp:
         config = json.load(fp)
     validate_chart_config(config)

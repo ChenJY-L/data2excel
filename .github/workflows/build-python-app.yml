@@ -62,6 +62,7 @@ jobs:
             --windows-console-mode=disable ^
             --enable-plugin=pyside6 ^
             --lto=yes ^
+            --include-data-files=src/chart_config.json=chart_config.json ^
             --output-dir=${{ env.OUTPUT_DIR }} ^
             --output-filename=${{ env.EXE_NAME }} ^
             --main=${{ env.MAIN_SCRIPT_PATH }} ^

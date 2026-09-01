@@ -1912,53 +1912,60 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             wb, sheetnames = self.create_excel_workbook(Chpath, C, reset_file=reset_file)
         elif clear_existing:
             self.prepare_main_sheets(wb, sheetnames, clear_existing=True)
-        self.currenttime = datetime.datetime.now()
-        self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
+        try:
+            self.currenttime = datetime.datetime.now()
+            self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
 
-        # 写入时间和标题
-        self.write_time_and_headers(wb, sheetnames, timearr, cycleNoarr)
-        self.currenttime = datetime.datetime.now()
-        self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
+            # 写入时间和标题
+            self.write_time_and_headers(wb, sheetnames, timearr, cycleNoarr)
+            self.currenttime = datetime.datetime.now()
+            self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
 
-        # 温度插值
-        yinterp = self.process_temperature_interpolation(wb, sheetnames, timearr, cycleNoarr, Tempvalue, Temptitle)
-        self.currenttime = datetime.datetime.now()
-        self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
+            # 温度插值
+            yinterp = self.process_temperature_interpolation(wb, sheetnames, timearr, cycleNoarr, Tempvalue, Temptitle)
+            self.currenttime = datetime.datetime.now()
+            self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
 
-        # 汇总标题
-        self.write_summary_data(wb, sheetnames, wave, ringwords, diffwords, Ch, C)
+            # 汇总标题
+            self.write_summary_data(wb, sheetnames, wave, ringwords, diffwords, Ch, C)
 
-        # 单环与差分
-        self.process_single_ring_data(
-            wb, sheetnames, Chvalues, Ch, ringwords, wave, datarange,
-            basesingle_dict, n, wn, m, timearr, expInfo
-        )
-        self.process_differential_data(
-            wb, sheetnames, Chvalues, Ch, diffwords, wave, datarange,
-            basediff_dict, n, wn, m, timearr, expInfo
-        )
+            # 单环与差分
+            self.process_single_ring_data(
+                wb, sheetnames, Chvalues, Ch, ringwords, wave, datarange,
+                basesingle_dict, n, wn, m, timearr, expInfo
+            )
+            self.process_differential_data(
+                wb, sheetnames, Chvalues, Ch, diffwords, wave, datarange,
+                basediff_dict, n, wn, m, timearr, expInfo
+            )
 
-        # 动态基准（Auto Base 打开时不覆盖）
-        self.handle_dynamic_base_cycle(wb, sheetnames, Ch, n, wn, C)
+            # 动态基准（Auto Base 打开时不覆盖）
+            self.handle_dynamic_base_cycle(wb, sheetnames, Ch, n, wn, C)
 
-        # 备注与梯度
-        self.add_info_data(wb, sheetnames, expInfo, timearr)
-        self.add_gradient_data(wb, sheetnames, expInfo, timearr, C, diffwords, wave)
+            # 备注与梯度
+            self.add_info_data(wb, sheetnames, expInfo, timearr)
+            self.add_gradient_data(wb, sheetnames, expInfo, timearr, C, diffwords, wave)
 
-        # 血糖
-        rng_lcol = self.add_glucose_data(wb, sheetnames, timearr, yinterp, C, expInfo=expInfo)
+            # 血糖
+            rng_lcol = self.add_glucose_data(wb, sheetnames, timearr, yinterp, C, expInfo=expInfo)
 
-        # 分段点sheet（仅第二次处理写入）
-        # if segment_points is not None:
-        #     self.write_segment_points_sheet(wb, segment_points, C)
+            # 分段点sheet（仅第二次处理写入）
+            # if segment_points is not None:
+            #     self.write_segment_points_sheet(wb, segment_points, C)
 
-        # 图表
-        self.charts = []
-        self.create_charts(wb, sheetnames, timearr, wave, Ch, wn, rng_lcol, expInfo, Chpath, C)
+            # 图表
+            self.charts = []
+            self.create_charts(wb, sheetnames, timearr, wave, Ch, wn, rng_lcol, expInfo, Chpath, C)
 
-        if close_wb:
-            wb.close()
-        return rng_lcol
+            return rng_lcol
+        finally:
+            # 中途异常时也必须关闭，否则Excel会一直占用输出文件，
+            # 导致后续处理无法删除/保存该文件
+            if close_wb:
+                try:
+                    wb.close()
+                except Exception:
+                    pass
 
     # 数据处理主函数
     def DataProcess(self):
@@ -2096,12 +2103,16 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             lineno = exc_tb.tb_lineno
             self.GuiRefresh(self.ErrorText, f"出错位置: 文件 {fname}, 第 {lineno} 行")
 
-            try:
-                if wb is not None:
+            # save失败不能影响close，否则工作簿会一直占用输出文件
+            if wb is not None:
+                try:
                     wb.save()
+                except Exception:
+                    pass
+                try:
                     wb.close()
-            except Exception:
-                pass
+                except Exception:
+                    pass
         finally:
             self.Process.setEnabled(True)
 
