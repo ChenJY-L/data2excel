@@ -312,15 +312,15 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 return s
 
         def header_kind(line):
-            # 兼容：血糖: / 基准周期: / [血糖] / [基准周期]
+            # 兼容血糖/血糖值、基准周期/基准，支持冒号或方括号段头。
             t = line.strip()
             if t.startswith('[') and t.endswith(']'):
                 t = t[1:-1].strip()
             if t.endswith(':'):
                 t = t[:-1].strip()
-            if t == '血糖':
+            if t in ('血糖', '血糖值'):
                 return 'blood_glucose'
-            if t == '基准周期':
+            if t in ('基准周期', '基准'):
                 return 'baseline_cycle'
             return None
 
