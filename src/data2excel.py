@@ -454,11 +454,8 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 prefix = match.group(1)
                 datakword = f"{prefix}-{i}环.dat" if C else f"{prefix}-Ch{i}.dat"
 
-            wbd = self.xwapp.books.open(datakword)
-            rawsheet = wbd.sheets[0]
-            Chvalues.append(rawsheet.range(rawsheet.used_range).value)
+            Chvalues.append(np.loadtxt(datakword, delimiter='\t'))
             self.GuiRefresh(self.Status, 'Loading Single Ring Data' + str(i))
-            wbd.close()
 
         Chvalues = np.asarray(Chvalues)
         return Chvalues, Ch, C, Chpath
@@ -2090,18 +2087,9 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             self.GuiRefresh(self.ErrorText, 'Process time: ' + str(self.currenttime - self.starttime).split('.')[0])
 
         # 错误处理
-        except Exception as ex:
-            import traceback, sys
-            self.GuiRefresh(self.ErrorText, str(ex))
-
-            # 打印完整堆栈信息
+        except Exception:
+            import traceback
             self.GuiRefresh(self.ErrorText, traceback.format_exc())
-
-            # 只打印行号信息
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            fname = exc_tb.tb_frame.f_code.co_filename
-            lineno = exc_tb.tb_lineno
-            self.GuiRefresh(self.ErrorText, f"出错位置: 文件 {fname}, 第 {lineno} 行")
 
             # save失败不能影响close，否则工作簿会一直占用输出文件
             if wb is not None:
