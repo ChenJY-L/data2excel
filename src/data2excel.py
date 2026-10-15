@@ -25,6 +25,7 @@ import datetime  # 时间模块
 # import time
 import os
 import numpy as np
+from scipy.signal import butter, sosfiltfilt
 from PySide6 import QtWidgets
 from PySide6.QtWidgets import *
 from PySide6.QtCore import *
@@ -530,6 +531,92 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                 wbt.close()
 
         return Tempvalue, Temptitle
+
+    def filter_doppler_data(self, path, timearr):
+        """对 moorVMS 1 Hz 数据做 4 阶、0.005 Hz 零相位低通滤波，再插值到光谱时间点。"""
+        lines = Path(path).read_text(encoding='utf-8-sig').splitlines()
+        date_text = next(line.split(':', 1)[1].strip() for line in lines if line.startswith('Monitoring Date:'))
+        time_text = next(line.split(':', 1)[1].strip() for line in lines if line.startswith('Monitoring Time:'))
+        start = datetime.datetime.strptime(date_text + ' ' + time_text, '%d/%m/%Y %H:%M:%S')
+        header_index = next(i for i, line in enumerate(lines) if line.startswith('Elapsed Time\t'))
+        columns = lines[header_index].split('\t')
+        channel_indices = [columns.index(name) for name in ('Flux1', 'Conc', 'Speed')]
+
+        elapsed, values = [], []
+        for line in lines[header_index + 1:]:
+            if not line.strip():
+                continue
+            fields = line.split('\t')
+            hours, minutes, seconds = map(int, fields[0].split(':'))
+            elapsed.append(hours * 3600 + minutes * 60 + seconds)
+            values.append([float(fields[i]) for i in channel_indices])
+
+        elapsed = np.asarray(elapsed, dtype=float)
+        if not np.all(np.diff(elapsed) == 1):
+            raise ValueError(f'多普勒数据不是连续的 1 Hz 采样: {path}')
+        values = np.asarray(values, dtype=float)
+        sos = butter(4, 0.005, btype='lowpass', fs=1.0, output='sos')
+        filtered = sosfiltfilt(sos, values, axis=0)
+        start_excel = (start - datetime.datetime(1899, 12, 30)).total_seconds() / 86400
+        doppler_times = start_excel + elapsed / 86400
+        spectrum_times = np.asarray(timearr, dtype=float).reshape(-1)
+        return np.column_stack([
+            np.interp(spectrum_times, doppler_times, filtered[:, i], left=np.nan, right=np.nan)
+            for i in range(3)
+        ])
+
+    def process_doppler_data(self, wb, sheetnames, Chpath, timearr, C):
+        """自动读取同目录的 moorVMS 文件，并输出对齐数据与图表。"""
+        files = []
+        for path in Path(Chpath).parent.glob('*.txt'):
+            with path.open(encoding='utf-8-sig') as file:
+                if 'moorVMS-PC Text Data File' in file.readline():
+                    files.append(path)
+        if not files:
+            return
+        if len(files) > 1:
+            raise ValueError('同目录有多个 moorVMS 文件，无法确定血流仪数据: ' + ', '.join(str(p) for p in files))
+
+        data = self.filter_doppler_data(files[0], timearr)
+        sheet_name = '多普勒血流' if C else 'Doppler Blood Flow'
+        ws = wb.sheets.add(sheet_name, after=wb.sheets[len(wb.sheets) - 1])
+
+        channels = ['Flux1 (PU)', 'Conc (PU)', 'Speed (mmHg)']
+        ws.range(1, 1).value = ['时间' if C else 'Time'] + channels
+        rows = [
+            [float(t)] + [float(v) if np.isfinite(v) else None for v in values]
+            for t, values in zip(np.asarray(timearr).reshape(-1), data)
+        ]
+        ws.range(2, 1).value = rows
+        ws.api.Columns('A:A').NumberFormatLocal = '[$-x-systime]h:mm:ss AM/PM'
+
+        if self.PLTCheckBox.isChecked():
+            chart = ws.charts.add(
+                left=self.CHART_LEFT, top=self.CHART_TOP,
+                width=self.CHART_WIDTH, height=self.CHART_HEIGHT,
+            )
+            chart.chart_type = 'xy_scatter_lines'
+            chart.api[0].Placement = xw.constants.Placement.xlFreeFloating
+            chart_api = chart.api[1]
+            chart_api.Legend.Position = -4107
+            time_min, time_max = float(np.min(timearr)), float(np.max(timearr))
+            chart_api.Axes(1).MinimumScale = time_min - 0.05 * (time_max - time_min)
+            chart_api.Axes(1).MaximumScale = time_max + 0.05 * (time_max - time_min)
+            x_range = ws.range(f'A2:A{len(rows) + 1}')
+            for i, name in enumerate(channels, start=2):
+                series = chart_api.SeriesCollection().NewSeries()
+                series.Name = name
+                series.XValues = x_range.api
+                col = xw.utils.col_name(i)
+                series.Values = ws.range(f'{col}2:{col}{len(rows) + 1}').api
+                series.AxisGroup = 2 if i == 4 else 1
+                series.MarkerStyle = 8
+                series.MarkerSize = 5
+                series.Format.Line.Weight = self.LINE_WEIGHT
+            self._configure_chart_appearance(
+                chart_api, sheet_name, 'PU', -1, wb, sheetnames, 0, secondary_title='mmHg'
+            )
+        wb.save()
 
     def parse_experiment_info(self, Chpath):
         """
@@ -1953,6 +2040,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
             # 图表
             self.charts = []
             self.create_charts(wb, sheetnames, timearr, wave, Ch, wn, rng_lcol, expInfo, Chpath, C)
+            self.process_doppler_data(wb, sheetnames, Chpath, timearr, C)
 
             return rng_lcol
         finally:
@@ -2596,6 +2684,7 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
                                     sheetnames,
                                     rng_lcol,
                                     title_font_size=18,
+                                    secondary_title=None,
                                     ):
         """
         配置图表外观样式
@@ -2654,7 +2743,9 @@ class GUI_Dialog(QWidget, QTUI.Ui_Data_Processing):
         if int(temp_index) != 0:
             # Y2轴标题
             chartApi.Axes(2, 2).HasTitle = True
-            if temp_index == -1:
+            if secondary_title is not None:
+                chartApi.Axes(2, 2).AxisTitle.Characters.Text = secondary_title
+            elif temp_index == -1:
                 chartApi.Axes(2, 2).AxisTitle.Characters.Text = 'ΔAd'
             else:
                 chartApi.Axes(2, 2).AxisTitle.Characters.Text = wb.sheets[sheetnames[7]].range(1, int(temp_index)).value

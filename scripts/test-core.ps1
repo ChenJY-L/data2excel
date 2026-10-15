@@ -7,6 +7,7 @@ foreach ($testFile in @(
     'test_note_parser.py'
     'test_chart_config.py'
     'test_data2excel_static.py'
+    'test_doppler.py'
 )) {
     if (-not (Test-Path -LiteralPath (Join-Path $testsDir $testFile))) {
         throw "Missing test file: $testFile"
